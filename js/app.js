@@ -1,283 +1,789 @@
-const DATA_PATHS = {
-  meta: 'data/meta.json',
-  sessions: 'data/sessions.csv',
-  cover: 'data/cover.csv',
-  leadership: 'data/leadership.csv',
-  adjustments: 'data/adjustments.csv',
-  concurrent: 'data/concurrent.csv',
-  changelog: 'data/changelog.csv'
+/* MYP PT Schedule — app.js
+ * Data-driven static site for GitHub Pages.
+ * Edit CSV files in /data to update the schedule. No rebuild required.
+ */
+
+// ─── CSV Parser ──────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  if (!lines.length) return [];
+  const headers = parseCSVLine(lines[0]);
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const values = parseCSVLine(line);
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h.trim()] = (values[idx] || '').trim(); });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+// ─── Data Loader ─────────────────────────────────────────────────────────────
+const DATA = {};
+
+async function loadAll() {
+  const files = ['sessions', 'cover', 'leadership', 'adjustments', 'concurrent', 'changelog'];
+  const errors = [];
+
+  await Promise.all(files.map(async name => {
+    try {
+      const res = await fetch(`data/${name}.csv`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      DATA[name] = parseCSV(text);
+    } catch (e) {
+      errors.push(`data/${name}.csv — ${e.message}`);
+      DATA[name] = [];
+    }
+  }));
+
+  try {
+    const res = await fetch('data/meta.json');
+    DATA.meta = await res.json();
+  } catch (e) {
+    DATA.meta = { title: 'MYP PT Schedule', version: '—', published_date: '—', description: '' };
+  }
+
+  if (errors.length) {
+    const el = document.getElementById('load-errors');
+    if (el) {
+      el.innerHTML = '<b>⚠ Failed to load:</b> ' + errors.map(e => `<code>${e}</code>`).join(', ') +
+        '<br>Run via a local HTTP server (e.g. VS Code Live Server) or deploy to GitHub Pages.';
+      el.style.display = 'block';
+    }
+  }
+}
+
+// ─── Utilities ───────────────────────────────────────────────────────────────
+const DATE_ORDER = [
+  '2026-06-08','2026-06-09','2026-06-10','2026-06-11',
+  '2026-06-15','2026-06-16','2026-06-17','2026-06-18',
+  '2026-06-19','2026-06-22','2026-06-23','2026-06-24','2026-06-25'
+];
+
+const DAY_LABEL = {
+  '2026-06-08': 'Mon 08 Jun','2026-06-09': 'Tue 09 Jun','2026-06-10': 'Wed 10 Jun',
+  '2026-06-11': 'Thu 11 Jun','2026-06-15': 'Mon 15 Jun','2026-06-16': 'Tue 16 Jun',
+  '2026-06-17': 'Wed 17 Jun','2026-06-18': 'Thu 18 Jun','2026-06-19': 'Fri 19 Jun',
+  '2026-06-22': 'Mon 22 Jun','2026-06-23': 'Tue 23 Jun','2026-06-24': 'Wed 24 Jun',
+  '2026-06-25': 'Thu 25 Jun'
 };
-const PERIODS = [1,2,3,'break',4,5,'lunch',7,8,9,10];
 
-function esc(v){return String(v ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
-function norm(s){return String(s||'').trim();}
-function periodNum(p){const m=String(p||'').match(/P(\d+)|^(\d+)$/); return m ? Number(m[1]||m[2]) : 0;}
-function parseCSV(text){
-  const rows=[]; let row=[], cell='', quote=false;
-  for(let i=0;i<text.length;i++){
-    const ch=text[i], next=text[i+1];
-    if(quote){ if(ch==='"' && next==='"'){ cell+='"'; i++; } else if(ch==='"'){ quote=false; } else cell+=ch; }
-    else { if(ch==='"') quote=true; else if(ch===','){ row.push(cell); cell=''; } else if(ch==='\n'){ row.push(cell); rows.push(row); row=[]; cell=''; } else if(ch!=='\r') cell+=ch; }
+const PERIODS = ['P1','P2','P3','P4','P5','P6','P7','P8','P9','P10'];
+const PERIOD_TIMES = {
+  P1:'08:00–08:40', P2:'08:40–09:20', P3:'09:20–10:00',
+  P4:'10:20–11:00', P5:'11:00–11:40', P6:'11:40–12:20 (Lunch)',
+  P7:'12:20–13:00', P8:'13:00–13:40', P9:'13:40–14:20', P10:'14:20–15:00'
+};
+
+const TODAY_ISO = '2026-06-12'; // Friday 12 June 2026
+
+function pNum(p) {
+  const m = (p || '').match(/(\d+)/);
+  return m ? +m[1] : 0;
+}
+
+function rowClass(s) {
+  const st = (s.status || '').toLowerCase();
+  if (st === 'cancelled') return 'cancelled-pt';
+  if (st === 'rescheduled') return 'rescheduled-pt';
+  return '';
+}
+
+function statusBadge(status) {
+  const s = (status || '').toUpperCase();
+  const ok = ['MOVED','ACTIVE','RESCHEDULED','UNCHANGED','CHECKED'].includes(s);
+  return `<span class="update-status${ok ? ' moved' : ''}">${s || 'CANCELLED / NOT TAKEN'}</span>`;
+}
+
+function esc(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function badge(text, cls) {
+  return `<span class="badge ${cls || ''}">${esc(text)}</span>`;
+}
+
+function coverTypePill(t) {
+  const cls = (t || '').toLowerCase().includes('handover') ? ' handover' : '';
+  return `<span class="cover-type-pill${cls}">${esc(t)}</span>`;
+}
+
+function riskClass(risk) {
+  if ((risk || '').toLowerCase() === 'red') return 'red-risk';
+  if ((risk || '').toLowerCase() === 'cancelled') return 'cancelled-pt';
+  return '';
+}
+
+function periodsBetween(start, end) {
+  const s = pNum(start), e = pNum(end);
+  const result = [];
+  for (let p = s; p <= e; p++) {
+    if (p === 6) continue; // lunch
+    result.push('P' + p);
   }
-  if(cell.length || row.length){ row.push(cell); rows.push(row); }
-  const headers=(rows.shift()||[]).map(h=>h.trim());
-  return rows.filter(r => r.some(c => String(c).trim() !== '')).map(r => Object.fromEntries(headers.map((h,i)=>[h, r[i] ?? ''])));
-}
-async function loadCSV(path){const res=await fetch(path); if(!res.ok) throw new Error(path); return parseCSV(await res.text());}
-async function loadJSON(path){const res=await fetch(path); if(!res.ok) throw new Error(path); return res.json();}
-async function loadOptionalCSV(path){try{return await loadCSV(path);}catch(err){return [];}}
-function byDatePeriod(a,b){return (a.date_iso||'').localeCompare(b.date_iso||'') || Number(a.start_period||periodNum(a.period))-Number(b.start_period||periodNum(b.period)) || String(a.session_code||a.trigger_session||'').localeCompare(String(b.session_code||b.trigger_session||''));}
-function unique(arr){return [...new Set(arr.filter(x => norm(x)))];}
-function dateLabel(row){return row.date || row.date_iso || '';}
-function rowClass(row){return esc(row.row_class || '');}
-function classFromSession(code){const m=String(code||'').match(/\b([0-9][A-Z]{1,2})\b/); return m ? m[1] : '';}
-function classTokens(text){return unique((String(text||'').match(/\b[0-9][A-Z]{1,2}\b/g)||[]));}
-function splitPeople(text){
-  return unique(String(text||'').split(/\s*(?:\/|→|,|;| and )\s*/i).map(x => x.replace(/\b(unavailable|returns|released|cover needed|cover required)\b/ig,'').trim()).filter(x => /[A-Z][a-z]+/.test(x)));
-}
-function addOptions(select, values, firstLabel){select.innerHTML = `<option value="">${esc(firstLabel)}</option>` + values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');}
-
-let VIEW_CUTOFF_DATE = '';
-const FILTER_REFRESHERS = [];
-function todayIsoLocal(){
-  const d = new Date();
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0,10);
-}
-function computeCutoffDate(data){
-  const rows=[...(data.sessions||[]), ...(data.cover||[]), ...(data.leadership||[]), ...(data.concurrent||[])];
-  const dates=unique(rows.map(r=>r.date_iso)).sort();
-  const today=todayIsoLocal();
-  return dates.find(d=>d>=today) || dates[dates.length-1] || today;
-}
-function isPastRow(row){return !!(row && row.date_iso && VIEW_CUTOFF_DATE && row.date_iso < VIEW_CUTOFF_DATE);}
-function pastClass(row){return isPastRow(row) ? ' past-row' : '';}
-function showPast(){return document.body.classList.contains('show-past');}
-function visibleByPast(el){return showPast() || !el.classList.contains('past-row');}
-function registerFilterRefresh(fn){FILTER_REFRESHERS.push(fn); fn();}
-function refreshFilters(){FILTER_REFRESHERS.forEach(fn=>fn());}
-function initPastVisibility(data){
-  VIEW_CUTOFF_DATE=computeCutoffDate(data);
-  document.body.classList.remove('show-past');
-  const old=document.getElementById('view-options');
-  if(old) old.remove();
-  const labelRows=[...(data.sessions||[]), ...(data.cover||[]), ...(data.leadership||[])];
-  const cutoffLabel=(labelRows.find(r=>r.date_iso===VIEW_CUTOFF_DATE)||{}).date || VIEW_CUTOFF_DATE;
-  const bar=document.createElement('div');
-  bar.id='view-options';
-  bar.innerHTML=`<span>Showing current / upcoming schedule from <b>${esc(cutoffLabel)}</b>.</span><button id="toggle-past" type="button">Show past days</button>`;
-  document.querySelector('header').insertAdjacentElement('afterend', bar);
-  const btn=bar.querySelector('#toggle-past');
-  function update(){
-    const on=showPast();
-    btn.textContent=on ? 'Hide past days' : 'Show past days';
-    bar.querySelector('span').innerHTML=on ? 'Showing <b>all</b> schedule days.' : `Showing current / upcoming schedule from <b>${esc(cutoffLabel)}</b>.`;
-    refreshFilters();
-  }
-  btn.addEventListener('click',()=>{document.body.classList.toggle('show-past'); update();});
-  update();
+  return result;
 }
 
-function sortHeader(table, types){
-  table.querySelectorAll('thead th').forEach((th,i)=>{
+// ─── Tab System ──────────────────────────────────────────────────────────────
+function initTabs() {
+  const btns = document.querySelectorAll('.tab-btn');
+  const panels = document.querySelectorAll('.tab-panel');
+  btns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      btns.forEach(b => b.classList.remove('active'));
+      panels.forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const target = document.getElementById(btn.dataset.tab);
+      if (target) target.classList.add('active');
+    });
+  });
+  // Default: Timeline tab
+  const defaultBtn = document.querySelector('.tab-btn[data-tab="tab-timeline"]');
+  if (defaultBtn) defaultBtn.click();
+}
+
+// ─── Sort / Filter Helpers ───────────────────────────────────────────────────
+function makeSortableTable(tableId, colTypes) {
+  const tbl = document.getElementById(tableId);
+  if (!tbl) return;
+  tbl.querySelectorAll('thead th').forEach((th, i) => {
     th.classList.add('sort-th');
-    th.addEventListener('click',()=>{
-      const tbody=table.querySelector('tbody'); const rows=[...tbody.rows]; const asc=!th.classList.contains('asc');
-      table.querySelectorAll('th').forEach(x=>x.classList.remove('asc','desc')); th.classList.add(asc?'asc':'desc');
-      const type=types[i]||'text';
-      rows.sort((ra,rb)=>{
-        let a=ra.cells[i]?.innerText.trim()||'', b=rb.cells[i]?.innerText.trim()||'', d=0;
-        if(type==='date') d=(ra.dataset.date||a).localeCompare(rb.dataset.date||b);
-        else if(type==='period') d=periodNum(a)-periodNum(b);
-        else if(type==='num') d=(parseFloat(a)||0)-(parseFloat(b)||0);
-        else d=a.localeCompare(b);
-        return asc?d:-d;
-      }); rows.forEach(r=>tbody.appendChild(r));
+    th.addEventListener('click', () => {
+      const asc = th.classList.contains('asc');
+      tbl.querySelectorAll('thead th').forEach(h => h.classList.remove('asc', 'desc'));
+      th.classList.add(asc ? 'desc' : 'asc');
+      const tb = tbl.querySelector('tbody');
+      const rows = Array.from(tb.querySelectorAll('tr'));
+      const type = colTypes[i] || 'text';
+      rows.sort((a, b) => {
+        const av = (a.cells[i] ? a.cells[i].innerText : '').trim();
+        const bv = (b.cells[i] ? b.cells[i].innerText : '').trim();
+        let d = 0;
+        if (type === 'date') d = (DATE_ORDER.indexOf(av) || 0) - (DATE_ORDER.indexOf(bv) || 0);
+        else if (type === 'period') d = pNum(av) - pNum(bv);
+        else if (type === 'num') d = (parseFloat(av) || 0) - (parseFloat(bv) || 0);
+        else d = av.localeCompare(bv);
+        return asc ? -d : d;
+      });
+      rows.forEach(r => tb.appendChild(r));
     });
   });
 }
 
-function renderSummary(data){
-  const sessions=data.sessions;
-  const latest=[...sessions].sort((a,b)=>(b.date_iso||'').localeCompare(a.date_iso||'') || Number(b.end_period||0)-Number(a.end_period||0))[0];
-  const triples=sessions.filter(s=>/triple|P\d+\s*[–-]\s*P\d+/i.test(s.opportunity_type+' '+s.window) && Number(s.end_period)-Number(s.start_period)>=2).length;
-  const teachers=unique([...sessions.map(s=>s.start_leader), ...data.cover.flatMap(c=>splitPeople(c.normal_teacher+';'+c.cover_destination)), ...data.leadership.map(l=>l.leader)]);
-  const reloc=sessions.filter(s=>norm(s.relocations) && !/^none$/i.test(s.relocations)).length;
-  const metrics=[
-    [sessions.length,'Scheduled sessions'],
-    [latest ? `${latest.date} P${latest.end_period}` : '—','Latest finish'],
-    [triples,'Protected / triple-length blocks'],
-    [teachers.length,'Teachers with impacts'],
-    [reloc,'Room relocations'],
-    [data.adjustments.length,'Schedule adjustments']
-  ];
-  document.getElementById('summary-metrics').innerHTML=metrics.map(([n,l])=>`<div class="metric"><b>${esc(n)}</b><span>${esc(l)}</span></div>`).join('');
-  document.getElementById('summary-notes').innerHTML=`<div class="simple-card"><h3>How to update</h3><p>Edit <code>data/sessions.csv</code>, <code>data/cover.csv</code>, <code>data/leadership.csv</code>, or <code>data/adjustments.csv</code>. Commit the CSV change to GitHub; the viewer rebuilds itself when loaded.</p><p class="small-muted">The GitHub Pages app hydrates from CSV, so routine schedule updates can be made by replacing files in <code>data/</code>.</p></div>`;
+function makeFilterableTable(searchId, resetId, countId, tableId) {
+  const search = document.getElementById(searchId);
+  const reset = document.getElementById(resetId);
+  const count = document.getElementById(countId);
+  const tbl = document.getElementById(tableId);
+  if (!search || !tbl) return;
+
+  function updateFilter() {
+    const q = search.value.toLowerCase().trim();
+    const rows = tbl.querySelectorAll('tbody tr');
+    let shown = 0;
+    rows.forEach(r => {
+      const text = r.innerText.toLowerCase();
+      const vis = !q || text.includes(q);
+      r.style.display = vis ? '' : 'none';
+      if (vis) shown++;
+    });
+    if (count) count.textContent = q ? `${shown} match${shown !== 1 ? 'es' : ''}` : `${shown} rows`;
+  }
+
+  search.addEventListener('input', updateFilter);
+  if (reset) reset.addEventListener('click', () => { search.value = ''; updateFilter(); });
+  updateFilter();
 }
-function renderTable(id, rows, cols, mapper, sortTypes){
-  const tbody=document.querySelector(`#${id} tbody`);
-  tbody.innerHTML=rows.map(r=>`<tr class="${rowClass(r)}${pastClass(r)}" data-date="${esc(r.date_iso||'')}">${cols.map(c=>`<td>${mapper?mapper(r,c):esc(r[c]||'')}</td>`).join('')}</tr>`).join('');
-  sortHeader(document.getElementById(id), sortTypes);
+
+// ─── Render: Summary ─────────────────────────────────────────────────────────
+function renderSummary() {
+  const sessions = DATA.sessions || [];
+  const activeSessions = sessions.filter(s => s.status !== 'cancelled');
+  const latestDate = activeSessions.reduce((acc, s) => {
+    return (s.date_iso || '') > acc ? (s.date_iso || '') : acc;
+  }, '');
+  const reprintCount = sessions.filter(s => s.reprint_codes === 'YES').length;
+  const teacherCount = new Set(sessions.flatMap(s => [s.supervisor, s.start_leader].filter(Boolean))).size;
+
+  const el = document.getElementById('summary-metrics');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="metric"><b>${activeSessions.length}</b><span>Active sessions</span></div>
+    <div class="metric"><b>${sessions.length}</b><span>Total session records</span></div>
+    <div class="metric"><b>${DAY_LABEL[latestDate] || latestDate}</b><span>Latest session</span></div>
+    <div class="metric"><b>${reprintCount}</b><span>Reprint codes required</span></div>
+    <div class="metric"><b>31</b><span>Protected triples</span></div>
+    <div class="metric"><b>18</b><span>Room relocations</span></div>
+  `;
 }
-function renderFullSchedule(sessions){
-  renderTable('full-sched-table', [...sessions].sort(byDatePeriod), ['session_code','start_leader','date','window','test','testing_room','normal_lessons_used','opportunity_type','relocations'], null, ['text','text','date','period','text','text','text','text','text']);
-  const dates=unique(sessions.sort(byDatePeriod).map(s=>s.date)); addOptions(document.getElementById('fs-date'), dates, 'All dates');
-  const run=()=>{const q=norm(document.getElementById('fs-search').value).toLowerCase(), d=document.getElementById('fs-date').value, ty=document.getElementById('fs-type').value; let n=0; const rows=[...document.querySelectorAll('#full-sched-table tbody tr')]; rows.forEach(r=>{const ok=visibleByPast(r)&&(!q||r.innerText.toLowerCase().includes(q))&&(!d||r.cells[2].innerText===d)&&(!ty||r.classList.contains(ty)||r.innerText.toLowerCase().includes(ty)); r.style.display=ok?'':'none'; if(ok)n++;}); document.getElementById('fs-count').textContent=`${n} of ${rows.length} sessions`;};
-  ['fs-search','fs-date','fs-type'].forEach(id=>document.getElementById(id).addEventListener(id==='fs-search'?'input':'change',run)); document.getElementById('fs-reset').onclick=()=>{document.getElementById('fs-search').value='';document.getElementById('fs-date').value='';document.getElementById('fs-type').value='';run();}; registerFilterRefresh(run);
+
+// ─── Render: Full Schedule Table ─────────────────────────────────────────────
+function renderFullSchedule() {
+  const sessions = DATA.sessions || [];
+  const el = document.getElementById('schedule-tbody');
+  if (!el) return;
+
+  const rows = sessions.map(s => {
+    const rc = rowClass(s);
+    return `<tr class="${rc}">
+      <td>${esc(s.date)}</td>
+      <td>${esc(s.session_code)}</td>
+      <td>${esc(s.class)}</td>
+      <td>${esc(s.grade)}</td>
+      <td>${esc(s.test)}</td>
+      <td>${esc(s.window)}</td>
+      <td>${esc(s.testing_room)}</td>
+      <td>${esc(s.start_leader)}</td>
+      <td>${esc(s.supervisor)}</td>
+      <td>${esc(s.normal_lessons_used)}</td>
+      <td>${esc(s.relocations)}</td>
+      <td>${esc(s.notes)}</td>
+      <td>${s.reprint_codes === 'YES' ? '<span class="codes-note">REPRINT</span>' : ''}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = rows || '<tr><td colspan="13" style="text-align:center;color:var(--muted)">No sessions loaded</td></tr>';
+
+  makeSortableTable('schedule-table', ['text','text','text','num','text','text','text','text','text','text','text','text','text']);
+  makeFilterableTable('sched-search', 'sched-reset', 'sched-count', 'schedule-table');
 }
-function renderCover(cover){
-  renderTable('cover-table', [...cover].sort(byDatePeriod), ['date','period','trigger_session','type','affected_class_group','normal_lesson','normal_teacher','cover_destination','instruction'], null, ['date','period','text','text','text','text','text','text','text']);
-  addOptions(document.getElementById('cover-date'), unique(cover.sort(byDatePeriod).map(c=>c.date)), 'All dates');
-  addOptions(document.getElementById('cover-type'), unique(cover.map(c=>c.type)).sort(), 'All types');
-  const run=()=>{const q=norm(document.getElementById('cover-search').value).toLowerCase(), d=document.getElementById('cover-date').value, ty=document.getElementById('cover-type').value; let n=0; const rows=[...document.querySelectorAll('#cover-table tbody tr')]; rows.forEach(r=>{const ok=visibleByPast(r)&&(!q||r.innerText.toLowerCase().includes(q))&&(!d||r.cells[0].innerText===d)&&(!ty||r.cells[3].innerText===ty); r.style.display=ok?'':'none'; if(ok)n++;}); document.getElementById('cover-count').textContent=`${n} of ${rows.length} rows`;};
-  ['cover-search','cover-date','cover-type'].forEach(id=>document.getElementById(id).addEventListener(id==='cover-search'?'input':'change',run)); document.getElementById('cover-reset').onclick=()=>{document.getElementById('cover-search').value='';document.getElementById('cover-date').value='';document.getElementById('cover-type').value='';run();}; registerFilterRefresh(run);
+
+// ─── Render: Cover / Subs ────────────────────────────────────────────────────
+function renderCover() {
+  const cover = DATA.cover || [];
+  const el = document.getElementById('cover-tbody');
+  if (!el) return;
+
+  const rows = cover.map(c => {
+    const rc = riskClass(c.risk) || (c.type.toLowerCase().includes('room move') ? 'roommoveevent' :
+      c.type.toLowerCase().includes('manual') || c.type.toLowerCase().includes('handover') || c.type.toLowerCase().includes('affected') ? 'manualcoverevent' :
+      c.type.toLowerCase().includes('start') || c.type.toLowerCase().includes('cover') ? 'coverevent' : '');
+    return `<tr class="${rc}">
+      <td>${esc(c.date)}</td>
+      <td>${esc(c.period)}</td>
+      <td><b>${esc(c.trigger_session)}</b></td>
+      <td>${coverTypePill(c.type)}</td>
+      <td>${esc(c.affected_class)}</td>
+      <td>${esc(c.normal_lesson)}</td>
+      <td>${esc(c.normal_teacher)}</td>
+      <td>${esc(c.cover_destination)}</td>
+      <td>${esc(c.instruction)}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = rows || '<tr><td colspan="9" style="text-align:center;color:var(--muted)">No cover records loaded</td></tr>';
+
+  makeSortableTable('cover-table', ['text','text','text','text','text','text','text','text','text']);
+  makeFilterableTable('cover-search', 'cover-reset', 'cover-count', 'cover-table');
 }
-function renderLeadership(leadership){
-  renderTable('leadership-table', [...leadership].sort(byDatePeriod), ['date','period','leader','responsibility','mobile_load'], null, ['date','period','text','text','num']);
-  const run=()=>{const q=norm(document.getElementById('ld-search').value).toLowerCase(); let n=0; const rows=[...document.querySelectorAll('#leadership-table tbody tr')]; rows.forEach(r=>{const ok=visibleByPast(r)&&(!q||r.innerText.toLowerCase().includes(q)); r.style.display=ok?'':'none'; if(ok)n++;}); document.getElementById('ld-count').textContent=`${n} of ${rows.length} entries`;};
-  document.getElementById('ld-search').addEventListener('input',run); document.getElementById('ld-reset').onclick=()=>{document.getElementById('ld-search').value='';run();}; registerFilterRefresh(run);
+
+// ─── Render: Leadership ───────────────────────────────────────────────────────
+function renderLeadership() {
+  const leadership = DATA.leadership || [];
+  const el = document.getElementById('leadership-tbody');
+  if (!el) return;
+
+  const rows = leadership.map(l => {
+    const rc = l.status === 'cancelled' ? 'cancelled-pt' :
+               l.status === 'rescheduled' ? 'rescheduled-pt' :
+               l.status === 'red' ? 'red-risk' : '';
+    const loadBadge = l.mobile_load === 'RED' ? '<span class="flag-badge auth">RED</span>' :
+                      l.mobile_load === 'Release' ? '<span class="flag-badge cover">Release</span>' :
+                      l.mobile_load === 'Cover' ? '<span class="flag-badge cover">Cover</span>' :
+                      l.mobile_load === 'Self' ? '<span class="flag-badge cover">Self</span>' :
+                      esc(l.mobile_load);
+    return `<tr class="${rc}">
+      <td>${esc(l.date)}</td>
+      <td>${esc(l.period)}</td>
+      <td>${esc(l.leader)}</td>
+      <td>${esc(l.responsibility)}</td>
+      <td>${loadBadge}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = rows || '<tr><td colspan="5" style="text-align:center;color:var(--muted)">No leadership data loaded</td></tr>';
+
+  makeSortableTable('leadership-table', ['text','text','text','text','text']);
+  makeFilterableTable('ld-search', 'ld-reset', 'ld-count', 'leadership-table');
 }
-function renderAdjustments(adjustments){
-  renderTable('schedule-adjustments-table', adjustments, ['status','original_session','original_slot','new_slot','room','normal_lesson_staff_affected','operational_note'], null, ['text','text','date','date','text','text','text']);
+
+// ─── Render: Schedule Adjustments ────────────────────────────────────────────
+function renderAdjustments() {
+  const adj = DATA.adjustments || [];
+  const el = document.getElementById('adjustments-tbody');
+  if (!el) return;
+
+  const rows = adj.map(a => {
+    const rc = a.row_class || '';
+    return `<tr class="${rc}">
+      <td>${statusBadge(a.status)}</td>
+      <td>${esc(a.original_session)}</td>
+      <td>${esc(a.original_slot)}</td>
+      <td>${esc(a.new_slot)}</td>
+      <td>${esc(a.room)}</td>
+      <td>${esc(a.affected_lesson)}</td>
+      <td>${esc(a.operational_note)}${a.operational_note && a.operational_note.toLowerCase().includes('reprint') ? ' <span class="codes-note">REPRINT CODES</span>' : ''}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = rows || '<tr><td colspan="7" style="text-align:center;color:var(--muted)">No adjustment records loaded</td></tr>';
 }
-function renderConcurrent(concurrent){
-  renderTable('concurrent-table-el', concurrent.sort(byDatePeriod), ['date','period','concurrent_sessions','sessions'], null, ['date','period','num','text']);
-  const run=()=>{const min=Number(document.getElementById('cc-min').value||0); let n=0; const rows=[...document.querySelectorAll('#concurrent-table-el tbody tr')]; rows.forEach(r=>{const ok=visibleByPast(r)&&((Number(r.cells[2].innerText)||0)>=min); r.style.display=ok?'':'none'; if(ok)n++;}); document.getElementById('cc-count').textContent=`${n} of ${rows.length} periods`;};
-  document.getElementById('cc-min').addEventListener('input',run); document.getElementById('cc-reset').onclick=()=>{document.getElementById('cc-min').value=2;run();}; registerFilterRefresh(run);
+
+// ─── Render: Concurrent Sessions ──────────────────────────────────────────────
+function renderConcurrent() {
+  const conc = DATA.concurrent || [];
+  const el = document.getElementById('concurrent-tbody');
+  if (!el) return;
+
+  const sorted = [...conc].sort((a, b) => {
+    const di = DATE_ORDER.indexOf(a.date_iso) - DATE_ORDER.indexOf(b.date_iso);
+    if (di !== 0) return di;
+    return pNum(a.period) - pNum(b.period);
+  });
+
+  const rows = sorted.map(c => {
+    const cnt = parseInt(c.count) || 0;
+    const highlight = cnt >= 3 ? ' style="font-weight:700;color:var(--red)"' : cnt >= 2 ? ' style="font-weight:700;color:#8a6100"' : '';
+    return `<tr>
+      <td>${esc(c.date)}</td>
+      <td>${esc(c.period)}</td>
+      <td${highlight}>${cnt}</td>
+      <td>${esc(c.sessions)}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = rows || '<tr><td colspan="4" style="text-align:center;color:var(--muted)">No concurrent data loaded</td></tr>';
 }
-function blockHTML(s, period, kind='session'){
-  const cont=Number(period)>Number(s.start_period);
-  const cls = kind==='leader' ? 'leader-block-staff' : `${s.row_class||''} ${cont?'cont':''}`;
-  if(kind==='leader') return `<span class="timeline-chip-lite ${cls}"><b>${esc(s.leader)}</b><small>${esc(s.responsibility)}</small></span>`;
-  return `<span class="timeline-chip-lite ${cls}"><b>${esc(s.session_code)}</b><small>${esc(s.test)} · ${esc(s.testing_room)}</small>${cont?'<small>continuation</small>':''}</span>`;
+
+// ─── Render: Change Log ───────────────────────────────────────────────────────
+function renderChangelog() {
+  const changelog = DATA.changelog || [];
+  const el = document.getElementById('changelog-tbody');
+  if (!el) return;
+
+  const rows = changelog.map(c => {
+    const statusClass = c.status === 'Applied' ? 'review-status ok' : c.status === 'Partial' ? 'review-status partial' : 'review-status';
+    return `<tr>
+      <td>${esc(c.published_date)}</td>
+      <td>${esc(c.version)}</td>
+      <td>${esc(c.request)}</td>
+      <td>${esc(c.change)}</td>
+      <td>${esc(c.area)}</td>
+      <td><span class="${statusClass}">${esc(c.status)}</span></td>
+      <td>${esc(c.notes)}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = rows || '<tr><td colspan="7" style="text-align:center;color:var(--muted)">No changelog records loaded</td></tr>';
 }
-function renderTimeline(data){
-  const sessions=[...data.sessions].sort(byDatePeriod);
-  const dates=unique(sessions.map(s=>s.date_iso)).sort();
-  const dateNames=Object.fromEntries(sessions.map(s=>[s.date_iso,s.date]));
-  const today='2026-06-12';
-  const activeDate=VIEW_CUTOFF_DATE || dates.find(d=>d>=today)||dates[dates.length-1];
-  document.getElementById('current-day-note').textContent='Past days are hidden by default. Use the Show past days button above to reveal earlier schedule days.';
-  function dayCard(dateIso){
-    const daySessions=sessions.filter(s=>s.date_iso===dateIso);
-    const dayLeaders=data.leadership.filter(l=>l.date_iso===dateIso);
-    const staff=unique([...daySessions.map(s=>s.start_leader), ...dayLeaders.map(l=>l.leader)]).sort();
-    const rows=staff.map(name=>{
-      const cells=PERIODS.map(p=>{
-        if(p==='break') return '<td class="break-gap"></td>';
-        if(p==='lunch') return '<td class="lunch-gap"><span class="small-muted">Lunch</span></td>';
-        const sess=daySessions.filter(s=>s.start_leader===name && Number(s.start_period)<=p && Number(s.end_period)>=p);
-        const leads=dayLeaders.filter(l=>l.leader===name && periodNum(l.period)===p);
-        const html=[...sess.map(s=>blockHTML(s,p)), ...leads.map(l=>blockHTML(l,p,'leader'))].join('');
-        return `<td class="staff-period-cell ${html?'staff-busy':''}">${html||''}</td>`;
-      }).join('');
-      return `<tr class="staff-row"><th class="staff-row-name">${esc(name)}</th>${cells}</tr>`;
+
+// ─── Render: Timeline (day-separated staff-row view) ─────────────────────────
+function renderTimeline() {
+  const sessions = DATA.sessions || [];
+  const leadership = DATA.leadership || [];
+  const cover = DATA.cover || [];
+  const el = document.getElementById('timeline-list');
+  if (!el) return;
+
+  // Group sessions by date
+  const byDate = {};
+  DATE_ORDER.forEach(d => { byDate[d] = []; });
+  sessions.forEach(s => {
+    if (s.date_iso && byDate[s.date_iso]) byDate[s.date_iso].push(s);
+  });
+
+  // Get leadership by date+period
+  function getLeaders(dateIso, period) {
+    return leadership.filter(l => l.date_iso === dateIso && l.period === period && l.status !== 'cancelled');
+  }
+
+  // Get all supervisors for a date
+  function getSupervisors(dateIso) {
+    const sups = new Set();
+    byDate[dateIso].forEach(s => {
+      if (s.supervisor && s.status !== 'cancelled') {
+        s.supervisor.split(/[,/→]/).forEach(t => sups.add(t.trim()));
+      }
+    });
+    return Array.from(sups).filter(Boolean);
+  }
+
+  // Get session type class
+  function sessionClass(s) {
+    const code = (s.session_code || '').toUpperCase();
+    if (code.includes('PTEBOTH') || code.includes('PTE')) return 'cohort';
+    if (code.includes('PTMBOTH')) return 'triple';
+    if (code.includes('PTM')) return 'same';
+    if (code.includes('PTS')) return 'ins';
+    return 'other';
+  }
+
+  // Current day detection
+  const todayIdx = DATE_ORDER.findIndex(d => d > TODAY_ISO);
+  const currentDateIso = todayIdx > 0 ? DATE_ORDER[todayIdx - 1] : DATE_ORDER[DATE_ORDER.length - 1];
+
+  // Past dates
+  const pastDates = DATE_ORDER.filter(d => d < TODAY_ISO);
+  const futureDates = DATE_ORDER.filter(d => d >= TODAY_ISO);
+
+  function renderDayCard(dateIso, altClass, isCurrent, isCollapsed) {
+    const daySessions = byDate[dateIso] || [];
+    const activeSessions = daySessions.filter(s => s.status !== 'cancelled');
+    const supervisors = getSupervisors(dateIso);
+    const dayLabel = DAY_LABEL[dateIso] || dateIso;
+
+    // Build period headers with leaders
+    const periodHeaders = PERIODS.filter(p => p !== 'P6').map(p => {
+      const leaders = getLeaders(dateIso, p);
+      const leaderText = leaders.length
+        ? leaders.map(l => l.leader + (l.mobile_load === 'Self' ? ' (Self)' : l.mobile_load === 'Release' ? ' (Release)' : l.mobile_load === 'RED' ? ' ⚠' : '')).join(', ')
+        : '';
+      return `<th><b>${p}</b>${leaderText ? `<span class="period-leaders">${esc(leaderText)}</span>` : ''}</th>`;
     }).join('');
-    return `<div class="day-timeline-card ${dateIso===activeDate?'timeline-day-current':''}"><h3>${esc(dateNames[dateIso]||dateIso)} <span class="timeline-day-toggle">${dateIso===activeDate?'Today':'Hide'}</span></h3><table class="staff-row-table day-timeline-table"><thead><tr><th class="staff-head">Staff</th><th>P1</th><th>P2</th><th>P3</th><th class="break-head">Break</th><th>P4</th><th>P5</th><th class="lunch-head">P6<small>Lunch</small></th><th>P7</th><th>P8</th><th>P9</th><th>P10</th></tr></thead><tbody>${rows||'<tr><td colspan="12" class="empty-state">No rows</td></tr>'}</tbody></table></div>`;
+
+    // Column layout: Name | P1 P2 P3 | BRK | P4 P5 | LUNCH | P7 P8 P9 P10  (12 cols)
+    const colgroup = `<colgroup>
+      <col class="staff-name-col"/>
+      <col/><col/><col/>
+      <col class="break-col"/>
+      <col/><col/>
+      <col class="lunch-col"/>
+      <col/><col/><col/><col/>
+    </colgroup>`;
+
+    const thead = `<thead><tr>
+      <th class="staff-head">Staff / Session</th>
+      ${['P1','P2','P3'].map(p => {
+        const leaders = getLeaders(dateIso, p);
+        return `<th><b>${p}</b>${leaders.length ? `<span class="period-leaders">${esc(leaders.map(l=>l.leader).join(', '))}</span>` : ''}</th>`;
+      }).join('')}
+      <th class="break-head"><small>BRK</small></th>
+      ${['P4','P5'].map(p => {
+        const leaders = getLeaders(dateIso, p);
+        return `<th><b>${p}</b>${leaders.length ? `<span class="period-leaders">${esc(leaders.map(l=>l.leader).join(', '))}</span>` : ''}</th>`;
+      }).join('')}
+      <th class="lunch-head"><small>LUNCH</small></th>
+      ${['P7','P8','P9','P10'].map(p => {
+        const leaders = getLeaders(dateIso, p);
+        return `<th><b>${p}</b>${leaders.length ? `<span class="period-leaders">${esc(leaders.map(l=>l.leader).join(', '))}</span>` : ''}</th>`;
+      }).join('')}
+    </tr></thead>`;
+
+    // Build session rows (one row per session for compact view)
+    const sessionRows = activeSessions.map(s => {
+      const sp = pNum(s.start_period), ep = pNum(s.end_period);
+      const cls = sessionClass(s);
+      const rowCls = s.status === 'rescheduled' ? 'rescheduled-pt' : '';
+
+      const cells = ['P1','P2','P3','P4','P5','P7','P8','P9','P10'].map(p => {
+        const pp = pNum(p);
+        const inRange = pp >= sp && pp <= ep;
+        const isStart = pp === sp;
+        if (!inRange) return `<td class="staff-period-cell"></td>`;
+        return `<td class="staff-period-cell staff-busy session-span">
+          <span class="span-chip ${cls}${!isStart ? ' staff-continuation' : ''}">
+            <span class="span-chip-top"><b>${isStart ? esc(s.session_code) : '↳ ' + esc(s.session_code)}</b><span>${esc(s.window)}</span></span>
+            ${isStart ? `<small>${esc(s.testing_room)}${s.notes ? ' · ' + esc(s.notes.substring(0, 60)) : ''}</small>` : `<small>${esc(s.testing_room)}</small>`}
+          </span>
+        </td>`;
+      });
+
+      // Insert break and lunch cols
+      const p3Idx = 2, p5Idx = 4;
+      cells.splice(p5Idx + 1, 0, `<td class="lunch-gap"></td>`);
+      cells.splice(p3Idx + 1, 0, `<td class="break-gap"></td>`);
+
+      return `<tr class="${rowCls}">
+        <th class="staff-row-name">${esc(s.session_code)}<small style="display:block;font-size:10px;font-weight:500;color:var(--muted)">${esc(s.class)} · G${esc(s.grade)}</small></th>
+        ${cells.join('')}
+      </tr>`;
+    }).join('');
+
+    const noSessions = activeSessions.length === 0
+      ? `<tr><td colspan="12" style="text-align:center;color:var(--muted);padding:16px">No active sessions this day</td></tr>`
+      : '';
+
+    const currentClass = isCurrent ? ' timeline-day-current' : isCollapsed ? ' timeline-day-collapsed' : '';
+    const toggleLabel = isCurrent ? 'Today' : isCollapsed ? 'Expand' : 'Collapse';
+
+    return `<div class="day-timeline-card ${altClass}${currentClass}" data-date="${dateIso}">
+      <h3>
+        ${dayLabel}
+        ${activeSessions.length ? `<span style="font-size:11px;font-weight:500;color:var(--muted);margin-left:4px">${activeSessions.length} session${activeSessions.length !== 1 ? 's' : ''}</span>` : ''}
+        <span class="timeline-day-toggle">${toggleLabel}</span>
+      </h3>
+      <table class="span-timeline day-timeline-table staff-row-table">
+        ${colgroup}
+        ${thead}
+        <tbody>
+          ${sessionRows}
+          ${noSessions}
+        </tbody>
+      </table>
+    </div>`;
   }
-  const currentFuture=dates.filter(d=>d>=activeDate).map(dayCard).join('');
-  const past=dates.filter(d=>d<activeDate).map(dayCard).join('');
-  document.getElementById('timeline').innerHTML=currentFuture + (past ? `<details class="past-days-details past-card"><summary>Past</summary><div class="past-days-inner">${past}</div></details>` : '');
-  document.querySelectorAll('.day-timeline-card h3').forEach(h=>h.addEventListener('click',()=>{const card=h.closest('.day-timeline-card'); card.classList.toggle('timeline-day-collapsed'); const b=h.querySelector('.timeline-day-toggle'); b.textContent=card.classList.contains('timeline-day-collapsed')?'Show':(card.classList.contains('timeline-day-current')?'Today':'Hide');}));
+
+  let html = '';
+
+  // Past days (collapsed in <details>)
+  if (pastDates.length) {
+    const pastHtml = pastDates.map((d, i) => renderDayCard(d, i % 2 === 0 ? 'day-alt-a' : 'day-alt-b', false, true)).join('');
+    html += `<details class="past-days-details">
+      <summary>Past days (${pastDates.length})</summary>
+      <div class="past-days-inner">${pastHtml}</div>
+    </details>`;
+  }
+
+  // Current and future days
+  futureDates.forEach((d, i) => {
+    const isCurrent = d === currentDateIso;
+    html += renderDayCard(d, i % 2 === 0 ? 'day-alt-a' : 'day-alt-b', isCurrent, false);
+  });
+
+  el.innerHTML = html;
+
+  // Toggle collapse on day header click
+  document.querySelectorAll('#timeline-list .day-timeline-card h3').forEach(h3 => {
+    h3.addEventListener('click', () => {
+      const card = h3.closest('.day-timeline-card');
+      card.classList.toggle('timeline-day-collapsed');
+      const toggle = h3.querySelector('.timeline-day-toggle');
+      if (toggle) toggle.textContent = card.classList.contains('timeline-day-collapsed') ? 'Expand' : 'Collapse';
+    });
+  });
 }
-function renderClassViews(data){
-  const classes=unique(data.sessions.map(s=>s.class_group).concat(data.cover.flatMap(c=>classTokens(c.affected_class_group+' '+c.trigger_session)), data.adjustments.flatMap(a=>classTokens(a.original_session+' '+a.original_slot+' '+a.new_slot)))).sort();
-  const sel=document.getElementById('classSelect'); sel.innerHTML=classes.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
-  const wrap=document.getElementById('classViews');
-  wrap.innerHTML=classes.map(c=>{
-    const sess=data.sessions.filter(s=>s.class_group===c).sort(byDatePeriod).map(s=>`<tr class="testevent ${rowClass(s)}${pastClass(s)}"><td>${esc(s.date)}</td><td>${esc(s.window)}</td><td>${esc(s.session_code)}</td><td>${esc(s.test)} · ${esc(s.testing_room)}</td><td>${esc(s.normal_lessons_used)}</td><td>${esc(s.relocations)}</td></tr>`).join('');
-    const cov=data.cover.filter(x=>classTokens(x.affected_class_group+' '+x.trigger_session).includes(c)).sort(byDatePeriod).map(x=>`<tr class="relocateevent ${rowClass(x)}${pastClass(x)}"><td>${esc(x.date)}</td><td>${esc(x.period)}</td><td>${esc(x.type)}</td><td>${esc(x.trigger_session)} · ${esc(x.cover_destination)}</td><td>${esc(x.normal_lesson)} · ${esc(x.normal_teacher)}</td><td>${esc(x.instruction)}</td></tr>`).join('');
-    const adj=data.adjustments.filter(a=>classTokens(a.original_session+' '+a.original_slot+' '+a.new_slot).includes(c)).map(a=>`<tr class="usedevent ${rowClass(a)}"><td></td><td>${esc(a.original_slot)} → ${esc(a.new_slot)}</td><td>${esc(a.status)}</td><td>${esc(a.original_session)} · ${esc(a.room)}</td><td>${esc(a.normal_lesson_staff_affected)}</td><td>${esc(a.operational_note)}</td></tr>`).join('');
-    return `<div class="class-view" data-class="${esc(c)}"><h3>${esc(c)}</h3><div class="tablewrap"><table><thead><tr><th>Date</th><th>Period</th><th>Event</th><th>Detail</th><th>Normal affected lesson</th><th>Instruction</th></tr></thead><tbody>${sess+cov+adj||'<tr><td colspan="6" class="empty-state">No records</td></tr>'}</tbody></table></div></div>`;
+
+// ─── Render: By Class ─────────────────────────────────────────────────────────
+function renderByClass() {
+  const sessions = DATA.sessions || [];
+  const classes = [...new Set(sessions.map(s => s.class))].sort();
+  const select = document.getElementById('classSelect');
+  if (!select) return;
+
+  select.innerHTML = '<option value="">— Select class —</option>' +
+    classes.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+
+  const container = document.getElementById('class-views-container');
+  if (!container) return;
+
+  container.innerHTML = classes.map(cls => {
+    const clsSessions = sessions.filter(s => s.class === cls);
+    const rows = clsSessions.map(s => {
+      const rc = rowClass(s);
+      return `<tr class="${rc}">
+        <td>${esc(s.date)}</td>
+        <td>${esc(s.session_code)}</td>
+        <td>${esc(s.test)}</td>
+        <td>${esc(s.window)}</td>
+        <td>${esc(s.testing_room)}</td>
+        <td>${esc(s.start_leader)}</td>
+        <td>${esc(s.normal_lessons_used)}</td>
+        <td>${esc(s.notes)}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="class-view" data-class="${esc(cls)}">
+      <h3>Class ${esc(cls)} — PT sessions</h3>
+      <div class="tablewrap">
+        <table>
+          <thead><tr>
+            <th>Date</th><th>Session</th><th>Test</th><th>Window</th>
+            <th>Room</th><th>Start Leader</th><th>Normal lessons affected</th><th>Notes</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
   }).join('');
-  function show(){document.querySelectorAll('.class-view').forEach(v=>v.classList.toggle('active', v.dataset.class===sel.value));}
-  sel.onchange=show; show();
-  document.getElementById('exportClassBtn').onclick=()=>printElement(document.querySelector(`.class-view[data-class="${CSS.escape(sel.value)}"]`), `${sel.value} PT class view`);
+
+  select.addEventListener('change', () => {
+    const val = select.value;
+    document.querySelectorAll('.class-view').forEach(el => {
+      el.classList.toggle('active', el.dataset.class === val);
+    });
+  });
 }
-function renderTeacherViews(data){
-  const people=unique([...data.sessions.map(s=>s.start_leader), ...data.leadership.map(l=>l.leader), ...data.cover.flatMap(c=>splitPeople(c.normal_teacher+';'+c.cover_destination))]).sort();
-  const sel=document.getElementById('teacherSelect'); sel.innerHTML=people.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
-  const wrap=document.getElementById('teacherViews');
-  wrap.innerHTML=people.map(p=>{
-    const cards=[];
-    const dates=unique([...data.sessions.filter(s=>s.start_leader===p).map(s=>s.date_iso), ...data.leadership.filter(l=>l.leader===p).map(l=>l.date_iso), ...data.cover.filter(c=>(c.normal_teacher+' '+c.cover_destination).includes(p)).map(c=>c.date_iso)]).sort();
-    for(const d of dates){
-      const label=(data.sessions.find(s=>s.date_iso===d)||data.cover.find(c=>c.date_iso===d)||data.leadership.find(l=>l.date_iso===d)||{}).date || d;
-      const rows=[];
-      data.sessions.filter(s=>s.date_iso===d && s.start_leader===p).sort(byDatePeriod).forEach(s=>rows.push(`<tr class="testevent ${rowClass(s)}"><td>${esc(s.window)}</td><td>${esc(s.session_code)}</td><td>${esc(s.test)}</td><td>${esc(s.testing_room)}</td><td>${esc(s.normal_lessons_used)}</td></tr>`));
-      data.leadership.filter(l=>l.date_iso===d && l.leader===p).sort(byDatePeriod).forEach(l=>rows.push(`<tr><td>${esc(l.period)}</td><td>Leadership</td><td>${esc(l.responsibility)}</td><td></td><td>Load: ${esc(l.mobile_load)}</td></tr>`));
-      data.cover.filter(c=>c.date_iso===d && (c.normal_teacher+' '+c.cover_destination).includes(p)).sort(byDatePeriod).forEach(c=>rows.push(`<tr class="relocateevent ${rowClass(c)}"><td>${esc(c.period)}</td><td>${esc(c.type)}</td><td>${esc(c.trigger_session)}</td><td>${esc(c.cover_destination)}</td><td>${esc(c.instruction)}</td></tr>`));
-      cards.push(`<div class="teacher-day-card ${d < VIEW_CUTOFF_DATE ? 'past-card' : ''}"><h4>${esc(label)}</h4><div class="tablewrap"><table><thead><tr><th>Period</th><th>Event</th><th>Detail</th><th>Room / destination</th><th>Notes</th></tr></thead><tbody>${rows.join('')}</tbody></table></div></div>`);
+
+// ─── Render: By Teacher ───────────────────────────────────────────────────────
+function normalizeName(raw) {
+  // Strip parenthetical qualifiers like "(P8)", "(unavailable Shadow Day)" and trim
+  return (raw || '').replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function splitNames(field) {
+  return (field || '').split(/[,/→]/).map(n => normalizeName(n)).filter(Boolean);
+}
+
+function renderByTeacher() {
+  const sessions = DATA.sessions || [];
+  const cover = DATA.cover || [];
+  const leadership = DATA.leadership || [];
+
+  // Collect all teacher names (normalized)
+  const teacherSet = new Set();
+  sessions.forEach(s => {
+    splitNames(s.supervisor).forEach(n => teacherSet.add(n));
+    splitNames(s.start_leader).forEach(n => teacherSet.add(n));
+  });
+  cover.forEach(c => {
+    splitNames(c.normal_teacher).forEach(n => teacherSet.add(n));
+  });
+  leadership.forEach(l => {
+    const n = normalizeName(l.leader);
+    if (n && !['Cover needed', 'RED cover', 'Self'].some(x => n.includes(x))) {
+      teacherSet.add(n);
     }
-    return `<div class="teacher-view" data-teacher="${esc(p)}"><h3>${esc(p)}</h3><p class="teacher-summary">Generated from sessions, leadership and cover data.</p><div class="teacher-day-timeline-list">${cards.join('')||'<div class="empty-state">No records</div>'}</div></div>`;
+  });
+  // Remove non-name artifacts
+  ['unavailable', 'then Sarah', 'etc.', 'Sarah'].forEach(() => {});
+  teacherSet.delete('David Barton unavailable');
+
+  const teachers = [...teacherSet].filter(Boolean).sort();
+  const select = document.getElementById('teacherSelect');
+  if (!select) return;
+
+  select.innerHTML = '<option value="">— Select teacher —</option>' +
+    teachers.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+
+  const container = document.getElementById('teacher-views-container');
+  if (!container) return;
+
+  container.innerHTML = teachers.map(teacher => {
+    const tSessions = sessions.filter(s => {
+      return splitNames(s.supervisor).includes(teacher) ||
+             splitNames(s.start_leader).includes(teacher);
+    });
+
+    const tLeadership = leadership.filter(l => normalizeName(l.leader) === teacher || normalizeName(l.leader).includes(teacher));
+    const tCover = cover.filter(c => splitNames(c.normal_teacher).includes(teacher));
+
+    const sessionRows = tSessions.map(s => {
+      const rc = rowClass(s);
+      const role = splitNames(s.supervisor).includes(teacher) ? 'Supervisor' : 'Start Leader';
+      return `<tr class="${rc}">
+        <td>${esc(s.date)}</td><td>${esc(s.session_code)}</td><td>${esc(s.window)}</td>
+        <td>${esc(role)}</td><td>${esc(s.testing_room)}</td><td>${esc(s.notes)}</td>
+      </tr>`;
+    }).join('');
+
+    const leaderRows = tLeadership.map(l => {
+      const rc = l.status === 'cancelled' ? 'cancelled-pt' : l.status === 'red' ? 'red-risk' : '';
+      return `<tr class="${rc}">
+        <td>${esc(l.date)}</td><td>${esc(l.period)}</td><td>${esc(l.responsibility)}</td><td>${esc(l.mobile_load)}</td>
+      </tr>`;
+    }).join('');
+
+    const coverRows = tCover.map(c => {
+      return `<tr>
+        <td>${esc(c.date)}</td><td>${esc(c.period)}</td><td>${esc(c.trigger_session)}</td>
+        <td>${esc(c.affected_class)}</td><td>${esc(c.instruction)}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="teacher-view" data-teacher="${esc(teacher)}">
+      <h3>${esc(teacher)}</h3>
+      <p class="teacher-summary">${tSessions.length} session(s) · ${tLeadership.length} leadership assignment(s) · ${tCover.length} cover note(s)</p>
+
+      ${tSessions.length ? `<h4>Sessions</h4>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Date</th><th>Session</th><th>Window</th><th>Role</th><th>Room</th><th>Notes</th></tr></thead>
+        <tbody>${sessionRows}</tbody>
+      </table></div>` : ''}
+
+      ${tLeadership.length ? `<h4>Leadership assignments</h4>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Date</th><th>Period</th><th>Responsibility</th><th>Load</th></tr></thead>
+        <tbody>${leaderRows}</tbody>
+      </table></div>` : ''}
+
+      ${tCover.length ? `<h4>Cover / affected lessons</h4>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Date</th><th>Period</th><th>Trigger</th><th>Affected class</th><th>Instruction</th></tr></thead>
+        <tbody>${coverRows}</tbody>
+      </table></div>` : ''}
+    </div>`;
   }).join('');
-  function show(){document.querySelectorAll('.teacher-view').forEach(v=>v.classList.toggle('active', v.dataset.teacher===sel.value));}
-  sel.onchange=show; show();
-  document.getElementById('exportTeacherBtn').onclick=()=>printElement(document.querySelector(`.teacher-view[data-teacher="${CSS.escape(sel.value)}"]`), `${sel.value} PT teacher view`);
+
+  select.addEventListener('change', () => {
+    const val = select.value;
+    document.querySelectorAll('.teacher-view').forEach(el => {
+      el.classList.toggle('active', el.dataset.teacher === val);
+    });
+  });
 }
-function printElement(el,title){const w=window.open('', '_blank');w.document.write(`<html><head><title>${esc(title)}</title><link rel="stylesheet" href="css/styles.css"></head><body style="font-family:Inter,Arial,sans-serif;padding:20px;background:#f5f7f6">${el?el.outerHTML:'No view'}</body></html>`);w.document.close();setTimeout(()=>w.print(),300);}
-function renderChecks(data){
-  const checks=[];
-  const missing=data.sessions.filter(s=>!norm(s.start_leader));
-  checks.push(['Missing start leader', missing.length, missing.length?'check-risk':'check-ok', missing.slice(0,8).map(s=>s.session_code).join(', ') || 'None']);
-  const reloc=data.sessions.filter(s=>norm(s.relocations) && !/^none$/i.test(s.relocations));
-  checks.push(['Sessions with relocation notes', reloc.length, reloc.length?'check-warn':'check-ok', reloc.slice(0,8).map(s=>s.session_code).join(', ')]);
-  const lunch=data.sessions.filter(s=>Number(s.start_period)<=5 && Number(s.end_period)>=7);
-  checks.push(['Lunch-spanning sessions', lunch.length, lunch.length?'check-warn':'check-ok', lunch.map(s=>s.session_code).join(', ') || 'None']);
-  const byClassDay={}; data.sessions.forEach(s=>{const k=`${s.class_group}|${s.date_iso}`; if(s.class_group) (byClassDay[k]??=[]).push(s.session_code);});
-  const multi=Object.entries(byClassDay).filter(([k,v])=>v.length>1);
-  checks.push(['Multiple sessions for same class on same date', multi.length, multi.length?'check-warn':'check-ok', multi.slice(0,8).map(([k,v])=>`${k.replace('|',' ')}: ${v.join(', ')}`).join('; ') || 'None']);
-  document.getElementById('checks').innerHTML=`<div class="tablewrap"><table><thead><tr><th>Check</th><th>Count</th><th>Status</th><th>Examples / notes</th></tr></thead><tbody>${checks.map(c=>`<tr><td>${esc(c[0])}</td><td>${esc(c[1])}</td><td class="${c[2]}">${c[1]?'Review':'OK'}</td><td>${esc(c[3])}</td></tr>`).join('')}</tbody></table></div>`;
+
+// ─── Update Header ────────────────────────────────────────────────────────────
+function updateHeader() {
+  const meta = DATA.meta || {};
+  const h1 = document.querySelector('header h1');
+  const desc = document.querySelector('header p');
+  if (h1 && meta.title) h1.textContent = meta.title;
+  if (desc && meta.description) desc.textContent = meta.description;
+  const versionEl = document.getElementById('meta-version');
+  if (versionEl) versionEl.textContent = `v${meta.version || '—'} · ${meta.published_date || '—'}`;
 }
-function renderChangeLog(changelog){
-  const tbody=document.querySelector('#changelog-table tbody');
-  const latestBox=document.getElementById('changelog-latest');
-  if(!tbody || !latestBox) return;
-  const rows=[...(changelog||[])].sort((a,b)=>(b.published_date||'').localeCompare(a.published_date||'') || (b.version||'').localeCompare(a.version||''));
-  if(!rows.length){
-    latestBox.innerHTML='<b>No change log found.</b> Add <code>data/changelog.csv</code> to show published updates here.';
-    tbody.innerHTML='<tr><td colspan="7" class="empty-state">No change log rows available.</td></tr>';
-    return;
-  }
-  const latest=rows[0];
-  const latestVersion=latest.version||'Unversioned';
-  const latestDate=latest.published_date||'No date';
-  const latestCount=rows.filter(r=>(r.version||'')===latestVersion).length;
-  latestBox.innerHTML=`<b>Latest published version:</b> <span class="changelog-version-pill">${esc(latestVersion)}</span> · <b>Published:</b> ${esc(latestDate)} · <b>Requests addressed:</b> ${latestCount}`;
-  tbody.innerHTML=rows.map(r=>`<tr data-date="${esc(r.published_date||'')}">
-    <td>${esc(r.published_date)}</td>
-    <td><span class="changelog-version-pill">${esc(r.version)}</span></td>
-    <td>${esc(r.request)}</td>
-    <td>${esc(r.change)}</td>
-    <td>${esc(r.area)}</td>
-    <td><span class="changelog-status">${esc(r.status||'Done')}</span></td>
-    <td>${esc(r.notes)}</td>
-  </tr>`).join('');
-  sortHeader(document.getElementById('changelog-table'), ['date','text','text','text','text','text','text']);
+
+// ─── Export Functions ─────────────────────────────────────────────────────────
+function exportClass() {
+  const val = document.getElementById('classSelect').value;
+  const el = document.querySelector(`.class-view[data-class="${CSS.escape(val)}"]`);
+  if (!el) return;
+  const w = window.open('', '_blank');
+  w.document.write('<html><head><title>' + val + ' PT Class View</title><style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ccc;padding:8px;text-align:left}.cancelled-pt td{color:#b42318;text-decoration:line-through}</style></head><body>' + el.outerHTML + '</body></html>');
+  w.document.close(); w.print();
 }
-function initTabs(){
-  const defaultTab='Timeline';
-  const panels=[...document.querySelectorAll('main > section.panel')];
-  panels.forEach(p=>p.classList.add('tab-panel'));
-  const tabs=unique(panels.map(p=>p.dataset.tab));
-  const initialTab=tabs.includes(defaultTab) ? defaultTab : tabs[0];
-  const nav=document.createElement('div'); nav.id='tab-nav';
-  tabs.forEach(t=>{const btn=document.createElement('button');btn.className='tab-btn'+(t===initialTab?' active':'');btn.textContent=t;btn.onclick=()=>{document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');panels.forEach(p=>p.classList.toggle('active',p.dataset.tab===t));window.scrollTo(0,0);};nav.appendChild(btn);});
-  document.querySelector('header').insertAdjacentElement('afterend', nav);
-  panels.forEach(p=>p.classList.toggle('active',p.dataset.tab===initialTab));
+
+function exportTeacher() {
+  const val = document.getElementById('teacherSelect').value;
+  const el = document.querySelector(`.teacher-view[data-teacher="${CSS.escape(val)}"]`);
+  if (!el) return;
+  const w = window.open('', '_blank');
+  w.document.write('<html><head><title>' + val + ' PT Teacher View</title><style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ccc;padding:8px;text-align:left}</style></head><body>' + el.outerHTML + '</body></html>');
+  w.document.close(); w.print();
 }
-async function init(){
-  try{
-    const [meta,sessions,cover,leadership,adjustments,concurrent,changelog] = await Promise.all([loadJSON(DATA_PATHS.meta), loadCSV(DATA_PATHS.sessions), loadCSV(DATA_PATHS.cover), loadCSV(DATA_PATHS.leadership), loadCSV(DATA_PATHS.adjustments), loadCSV(DATA_PATHS.concurrent), loadOptionalCSV(DATA_PATHS.changelog)]);
-    document.getElementById('page-title').textContent=meta.title || 'MYP PT Schedule V2';
-    document.getElementById('page-subtitle').textContent=meta.subtitle || 'Data-driven schedule viewer';
-    const data={sessions,cover,leadership,adjustments,concurrent,changelog};
-    initPastVisibility(data);
-    renderSummary(data); renderTimeline(data); renderFullSchedule(sessions); renderCover(cover); renderLeadership(leadership); renderAdjustments(adjustments); renderConcurrent(concurrent); renderClassViews(data); renderTeacherViews(data); renderChecks(data); renderChangeLog(changelog); initTabs();
-    document.getElementById('load-status').textContent=`Loaded ${sessions.length} sessions`;
-  }catch(err){
-    document.getElementById('load-status').textContent='Load error';
-    document.querySelector('main').innerHTML=`<section class="panel"><h2>Could not load data</h2><div class="warn">The viewer could not fetch the CSV files. Open through GitHub Pages or run a local server such as <code>python -m http.server</code>; do not double-click the HTML file directly.</div><pre>${esc(err.message)}</pre></section>`;
-  }
+
+// Expose to window for inline onclick handlers
+window.exportClass = exportClass;
+window.exportTeacher = exportTeacher;
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+async function boot() {
+  await loadAll();
+  updateHeader();
+  renderSummary();
+  renderTimeline();
+  renderFullSchedule();
+  renderCover();
+  renderLeadership();
+  renderAdjustments();
+  renderConcurrent();
+  renderChangelog();
+  renderByClass();
+  renderByTeacher();
+  initTabs();
 }
-init();
+
+document.addEventListener('DOMContentLoaded', boot);

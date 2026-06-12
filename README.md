@@ -1,67 +1,79 @@
-# MYP PT Schedule Viewer — Data-driven version
+# MYP PT Schedule — Data-Driven Viewer
 
-This version separates the display from the schedule data.
+A static, GitHub Pages-ready schedule viewer for MYP Progress Tests. All operational data lives in CSV files in `/data` — update the schedule by editing CSVs only. No build step, no backend, no framework.
 
-## What to edit
+## File structure
 
-Edit the CSV files in `data/`:
+```
+index.html          ← layout containers only (no schedule rows)
+css/styles.css      ← all styling (extracted from original viewer)
+js/app.js           ← CSV loading, parsing, and rendering
+data/
+  sessions.csv      ← SOURCE OF TRUTH: all testing sessions
+  cover.csv         ← cover, release, room moves, displacement notes
+  leadership.csv    ← session leaders / mobile leaders by period
+  adjustments.csv   ← moved / cancelled / confirmed schedule changes
+  concurrent.csv    ← concurrency counts by day/period
+  changelog.csv     ← visible Change Log tab content
+  meta.json         ← title, version, published date, description
+README.md
+```
 
-- `sessions.csv` — the main testing-session source of truth.
-- `cover.csv` — cover, room moves, supervision handovers and related operational notes.
-- `leadership.csv` — period-by-period mobile leadership assignments.
-- `adjustments.csv` — audit trail of moved/cancelled/replaced sessions.
-- `concurrent.csv` — concurrent-session summary table.
+## Deploying to GitHub Pages
 
-`index.html`, `css/styles.css` and `js/app.js` should normally stay unchanged.
-
-## How to publish on GitHub Pages
-
-1. Put this folder in a GitHub repo.
-2. Commit and push.
-3. Enable GitHub Pages for the branch/folder that contains `index.html`.
-4. To update the schedule, edit the relevant CSV and push again.
+1. Create a repository and upload **everything** in this folder (keep the folder structure exactly as-is).
+2. In the repo: **Settings → Pages → Source: Deploy from a branch → main → / (root)**.
+3. Done. All paths are relative, so it works from the repo root or a project subpath.
 
 ## Local preview
 
-Do not double-click `index.html`; browser security can block CSV loading. Use a local server:
+Browsers block `fetch()` over `file://`, so don't double-click `index.html`. Use any local HTTP server:
 
-```bash
-cd pt-viewer-data-driven
-python -m http.server 8000
-```
+- **VS Code:** install the *Live Server* extension → right-click `index.html` → "Open with Live Server"
+- **Python:** `python3 -m http.server 8000` then open http://localhost:8000
+- **Node:** `npx serve`
 
-Then open `http://localhost:8000`.
+## Making schedule changes (the whole point)
 
-## Optional SQLite
+| You want to… | Edit this file |
+|---|---|
+| Add / move / cancel a testing session | `data/sessions.csv` |
+| Add a cover, release, or room-move note | `data/cover.csv` |
+| Change a session leader / mobile leader | `data/leadership.csv` |
+| Record a MOVED / CANCELLED adjustment | `data/adjustments.csv` |
+| Update concurrency counts | `data/concurrent.csv` |
+| Add a visible change-log entry | `data/changelog.csv` |
+| Change the title / version / banner text | `data/meta.json` |
 
-`data/schedule.sqlite` is included as a mirror of the CSV data. The web app currently hydrates from CSV because this works directly on GitHub Pages without additional libraries.
+Commit the CSV edit, push, and GitHub Pages updates automatically. **Never edit `index.html` for schedule changes.**
 
-## Notes
+### CSV conventions
 
-The original uploaded HTML is copied to `legacy-original.html` for comparison/back-up.
+- Fields containing commas must be wrapped in double quotes: `"P1 CONNECTED, P3 MATH"`.
+- A literal double quote inside a quoted field is doubled: `""`.
+- `status` column values: `active`, `cancelled` (red strikethrough), `rescheduled` (green moved highlight).
+- `date_iso` (YYYY-MM-DD) drives sorting and the past-day collapse; `date` (e.g. `Tue 16 Jun`) is the display label.
+- `reprint_codes`: `YES` shows the REPRINT badge.
+- In `cover.csv`, `risk` values: `normal`, `amber`, `red` (RED highlight), `cancelled`.
+- To add a new test day, add its ISO date to `DATE_ORDER` and `DAY_LABEL` in `js/app.js` (the one structural edit you may ever need).
 
-## Current / upcoming view
+## Display rules preserved from the original viewer
 
-The viewer now hides past schedule days by default. It uses the browser's current local date to find the current or next schedule day, then hides rows/cards before that date.
+- **Timeline is the default landing tab.** Past days are grouped under a collapsed "Past days" section; the current day is highlighted.
+- **Session leaders are NOT classroom teachers.** Leaders/mobile leaders render in period headings and the Leadership tab. The session card keeps the teacher/cover/supervision notes from `sessions.csv`. No staff rows imply a leader is teaching a class unless the data says they supervise/cover it.
+- P6 is lunch and blocked from schedule blocks; a break band sits between P3 and P4.
+- Class and teacher views are printable/exportable via the Print/Export buttons.
+- Cancelled sessions show in red strikethrough; moved sessions in green.
 
-Use the **Show past days** button at the top of the page to temporarily reveal the full audit trail.
+## Key represented changes (v2.6)
 
+- **Tue 16 P8 — 8C.PTEBOTH:** Saeed Smith covers/starts P8 (replacing Rob/mobile cover); Sarum supervises P9–P10.
+- **Wed 17 P7 — 8E.PTM2:** Saeed covers Sarum and starts the session at P7; David Barton finishes P8.
+- **7C.PTS:** confirmed on Wed 24 P4–P5 only (Uchenna starts P4, Liam continues P5). The stale Fri 19 P2–P3 entry exists only as a MOVED-from record in adjustments.
 
-## Change Log tab
+## Limitations & assumptions
 
-This version adds a data-driven Change Log tab. Update `data/changelog.csv` whenever a published schedule version addresses new requests. The viewer shows the latest published version, date, and the list of addressed requests.
-
-Recommended version format: `vYYYY-MM-DD.N`, for example `v2026-06-12.1`.
-
-Files required for the live repo:
-
-- `index.html`
-- `css/styles.css`
-- `js/app.js`
-- `data/sessions.csv`
-- `data/cover.csv`
-- `data/leadership.csv`
-- `data/adjustments.csv`
-- `data/concurrent.csv`
-- `data/changelog.csv`
-- `data/meta.json`
+- The CSV parser handles quoted fields and escaped quotes but not multi-line fields — keep each record on one line.
+- `concurrent.csv` is maintained by hand (matching the original viewer); it is not auto-derived from `sessions.csv`.
+- The "today" marker is fixed in `js/app.js` (`TODAY_ISO`); update it if you want a different focus day, or swap in `new Date()` logic.
+- Teacher views are derived by name-matching across `sessions.csv`, `cover.csv`, and `leadership.csv`, so spell names consistently across files.

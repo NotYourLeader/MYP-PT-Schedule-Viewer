@@ -1,3 +1,5 @@
+/* MYP PT Schedule — extracted and refined from original viewer */
+
 
 :root{--green:#1EA270;--green-dk:#137a51;--green-lt:#e6f7f1;--red:#F04E4F;--red-lt:#fff1f1;--line:#e2e8f0;--line-dk:#cbd5e1;--muted:#64748b;--bg:#f1f5f9;--ink:#0f172a;--ink-2:#334155;--card:#ffffff;--hdr:#0f172a;--radius:14px;--radius-sm:8px;--shadow:0 1px 3px rgba(15,23,42,.06),0 4px 14px rgba(15,23,42,.05);--shadow-md:0 4px 20px rgba(15,23,42,.12)}
 body{margin:0;background:var(--bg);font-family:'Inter',system-ui,-apple-system,sans-serif;color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
@@ -738,88 +740,3 @@ tr.rescheduled-pt td{
 }
 
 .red-risk td,.red-risk{background:#fff1f1!important;color:#7a271a!important;border-color:#F04E4F!important}.red-risk .cover-type-pill,.cover-type-pill.red{border-color:#b42318;color:#b42318;background:#fff1f1}.red-note{display:inline-block;border:1px solid #b42318;background:#fff1f1;color:#b42318;border-radius:999px;padding:2px 7px;font-size:10.5px;font-weight:900;margin-top:4px}.span-chip.red-risk,.teacher-block.red-risk,.staff-mini-block.red-risk{background:#fff1f1!important;color:#7a271a!important;border:2px solid #b42318!important}.red-risk .flag-note{color:#b42318!important;font-weight:900}
-
-/* === Data-driven shell additions === */
-.data-note{border-left:4px solid var(--green);background:#f0fdf4;padding:12px 14px;border-radius:10px;margin:0 0 12px;color:#14532d;font-size:13px;font-weight:650}
-.data-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
-.small-muted{font-size:12px;color:var(--muted);font-weight:600}
-.empty-state{color:var(--muted);font-style:italic;padding:14px}
-#load-status{font-size:12px;color:#94a3b8;font-weight:600;white-space:nowrap}
-.teacher-day-card h4,.day-timeline-card h3{font-size:14px}
-.timeline-chip-lite{display:block;border-radius:8px;padding:6px 7px;margin:0 0 5px;border:1px solid var(--line);background:#fbfffd;font-weight:700;line-height:1.2}
-.timeline-chip-lite small{display:block;margin-top:3px;font-size:10px;font-weight:600;color:#475467}.timeline-chip-lite.cont{border-style:dashed;opacity:.75}.timeline-chip-lite.cancelled-pt{text-decoration:line-through;background:#fff1f1;color:#b42318;border-color:#b42318}.timeline-chip-lite.red-risk{background:#fff1f1;color:#7a271a;border-color:#b42318}
-.generated-table td{white-space:normal}.controls input{padding:8px 12px;border:1.5px solid var(--line);border-radius:var(--radius-sm);background:var(--card);font-family:inherit;font-size:13px;color:var(--ink);outline:none}.controls input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(30,162,112,.12)}
-.check-ok{color:#057647;font-weight:800}.check-warn{color:#8a6100;font-weight:800}.check-risk{color:#b42318;font-weight:800}.card-list{display:flex;flex-direction:column;gap:12px}.simple-card{border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px}.simple-card h3{margin:0 0 6px;font-size:14px}.simple-card p{margin:3px 0;color:#334155;font-size:13px}.simple-card .mini-meta{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.mini-pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 7px;font-size:11px;font-weight:800;color:#334155;background:#f8fafc}
-
-/* === Current / upcoming schedule filter === */
-#view-options{
-  position:sticky;
-  top:0;
-  z-index:250;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  padding:8px 24px;
-  background:#ecfdf3;
-  border-bottom:1px solid #abefc6;
-  color:#054f31;
-  font-size:13px;
-  font-weight:650;
-}
-#view-options button{
-  border:1px solid var(--green);
-  background:#fff;
-  color:var(--green-dk);
-  border-radius:999px;
-  padding:6px 12px;
-  font-size:12px;
-  font-weight:800;
-  cursor:pointer;
-}
-#view-options button:hover{background:var(--green-lt)}
-body:not(.show-past) .past-row,
-body:not(.show-past) .past-card{
-  display:none!important;
-}
-@media print{
-  #view-options{display:none!important}
-  body:not(.show-past) .past-row,
-  body:not(.show-past) .past-card{display:revert!important}
-}
-
-
-/* === Change Log === */
-.changelog-panel .data-note{
-  margin-bottom:14px;
-}
-#changelog-table td:nth-child(3){
-  min-width:220px;
-  font-weight:700;
-}
-#changelog-table td:nth-child(4){
-  min-width:340px;
-}
-#changelog-table td:nth-child(5){
-  min-width:240px;
-}
-.changelog-version-pill{
-  display:inline-block;
-  border:1px solid var(--green);
-  border-radius:999px;
-  padding:2px 8px;
-  background:var(--green-lt);
-  color:var(--green-dk);
-  font-size:11px;
-  font-weight:800;
-}
-.changelog-status{
-  display:inline-block;
-  border-radius:999px;
-  padding:3px 8px;
-  font-weight:800;
-  font-size:11px;
-  border:1px solid #057647;
-  color:#057647;
-  background:#ecfdf3;
-}

@@ -1,25 +1,6 @@
 {
   "title": "MYP PT Schedule V2",
-  "subtitle": "Updated MYP PT Schedule V2: recent CSV-only updates applied for 8C.PTEBOTH Tue 16 P8, 8E.PTM2 Wed 17 P7, and 7C.PTS Wed 24 P4–P5. Timeline is the default tab.",
-  "source_file": "Thursday_11th_triples_update(1).html + CSV-only recent changes",
-  "generated_from": "existing CSV-driven viewer structure; updated CSV data only",
-  "data_files": [
-    "sessions.csv",
-    "cover.csv",
-    "leadership.csv",
-    "adjustments.csv",
-    "concurrent.csv",
-    "changelog.csv"
-  ],
-  "record_counts": {
-    "sessions": 84,
-    "cover": 43,
-    "leadership": 76,
-    "adjustments": 22,
-    "concurrent": 53,
-    "changelog": 3
-  },
-  "latest_version": "v2026-06-12.2",
-  "published_date": "2026-06-12",
-  "changelog_file": "changelog.csv"
+  "version": "2.6",
+  "published_date": "Thu 12 Jun 2026",
+  "description": "Updated MYP PT Schedule V2: Thu 11 correction applied — 6E does not test on Thu 11; 7C goes directly to F2-07 with Natalie; 6E cover with Liam P4 only. 8A PTMBOTH Mon 22 update applied. PTE triple update applied. Shadow Day/G8 event update applied. Saeed Tue P8 / Sarum Wed cover update applied."
 }

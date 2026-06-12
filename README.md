@@ -65,3 +65,17 @@ Files required for the live repo:
 - `data/concurrent.csv`
 - `data/changelog.csv`
 - `data/meta.json`
+
+
+## v2026-06-12.3 staff-accountability model
+
+This version separates two concepts that were previously being conflated:
+
+- **Session leader**: the person responsible for starting or mobile-leading a session. These appear in the period headings on the Timeline and in the Leadership tab.
+- **Primary class responsibility / cover**: the person physically responsible for the class in that period. These rows come from `data/staff_events.csv` and appear in the Timeline body and By Teacher views.
+
+`data/staff_events.csv` was rebuilt using the uploaded aSc XML timetable plus explicit cover overrides from `data/cover.csv`. Routine timetable changes should still be made in the CSV files; HTML/CSS/JS should only change for viewer behaviour or layout.
+
+Additional audit file included:
+
+- `data/staff_events_audit.csv` — shows the derived staff member for each session-period and whether the source was `normal_lessons_used`, `aSc XML`, or a manual cover override.

@@ -49,7 +49,7 @@
 
     <section class="panel" data-tab="Timeline">
       <h2>Timeline</h2>
-      <p class="timeline-help">Generated from <code>data/staff_events.csv</code> for staff-by-period accountability, with session details from <code>data/sessions.csv</code>. Previous days are grouped under Past; the current or next schedule day appears first.</p>
+      <p class="timeline-help">Staff rows show the person actually responsible for the class/cover in each period. Session leaders are shown inside the period headings. Previous days are grouped under Past; the current or next schedule day appears first.</p>
       <div id="current-day-note" class="current-day-note"></div>
       <div id="timeline" class="day-timeline-list"></div>
     </section>
@@ -62,7 +62,7 @@
         <label for="fs-type">Type</label><select id="fs-type" class="sf-sel"><option value="">All types</option><option value="triple">Triple</option><option value="same">Same subject</option><option value="crosscore">Cross-core</option><option value="forced">Forced</option><option value="cancelled-pt">Cancelled</option><option value="red-risk">Red risk</option></select>
         <button id="fs-reset" class="sf-reset">Reset</button><span id="fs-count" class="sf-count"></span>
       </div>
-      <div class="tablewrap"><table id="full-sched-table" class="generated-table"><thead><tr><th>Session code</th><th>Start leader</th><th>Date</th><th>Window</th><th>Test</th><th>Testing room</th><th>Normal lessons used</th><th>Opportunity type</th><th>Classes to relocate + destination</th></tr></thead><tbody></tbody></table></div>
+      <div class="tablewrap"><table id="full-sched-table" class="generated-table"><thead><tr><th>Session code</th><th>Session leader</th><th>Date</th><th>Window</th><th>Test</th><th>Testing room</th><th>Normal lessons used</th><th>Opportunity type</th><th>Classes to relocate + destination</th></tr></thead><tbody></tbody></table></div>
     </section>
 
     <section class="panel cover-panel" data-tab="Cover / Subs">

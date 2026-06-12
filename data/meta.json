@@ -1,6 +1,6 @@
 {
   "title": "MYP PT Schedule V2",
-  "subtitle": "Data-driven MYP PT Schedule V2 with changelog and staff-by-period accountability fixes.",
+  "subtitle": "Data-driven MYP PT Schedule. Staff rows show actual class responsibility; session leaders are shown in period headings.",
   "source_file": "Thursday_11th_cover_update.html",
   "generated_from": "Thursday_11th_cover_update.html",
   "data_files": [
@@ -22,5 +22,6 @@
   "latest_version": "v2026-06-12.1",
   "published_date": "2026-06-12",
   "changelog_file": "changelog.csv",
-  "version": "v2026-06-12.2"
+  "version": "v2026-06-12.3",
+  "notes": "Systematic staff-accountability correction using aSc XML plus explicit cover overrides."
 }

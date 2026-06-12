@@ -1,8 +1,8 @@
 {
   "title": "MYP PT Schedule V2",
-  "subtitle": "Data-driven MYP PT Schedule. Staff rows show actual class responsibility; session leaders are shown in period headings.",
-  "source_file": "Thursday_11th_cover_update.html",
-  "generated_from": "Thursday_11th_cover_update.html",
+  "subtitle": "Updated MYP PT Schedule V2: recent CSV-only updates applied for 8C.PTEBOTH Tue 16 P8, 8E.PTM2 Wed 17 P7, and 7C.PTS Wed 24 P4–P5. Timeline is the default tab.",
+  "source_file": "Thursday_11th_triples_update(1).html + CSV-only recent changes",
+  "generated_from": "existing CSV-driven viewer structure; updated CSV data only",
   "data_files": [
     "sessions.csv",
     "cover.csv",
@@ -13,15 +13,13 @@
   ],
   "record_counts": {
     "sessions": 84,
-    "cover": 46,
-    "leadership": 78,
-    "adjustments": 25,
-    "concurrent": 66,
-    "changelog": 5
+    "cover": 43,
+    "leadership": 76,
+    "adjustments": 22,
+    "concurrent": 53,
+    "changelog": 3
   },
-  "latest_version": "v2026-06-12.1",
+  "latest_version": "v2026-06-12.2",
   "published_date": "2026-06-12",
-  "changelog_file": "changelog.csv",
-  "version": "v2026-06-12.3",
-  "notes": "Systematic staff-accountability correction using aSc XML plus explicit cover overrides."
+  "changelog_file": "changelog.csv"
 }

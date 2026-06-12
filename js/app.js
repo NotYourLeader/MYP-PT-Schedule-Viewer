@@ -5,8 +5,7 @@ const DATA_PATHS = {
   leadership: 'data/leadership.csv',
   adjustments: 'data/adjustments.csv',
   concurrent: 'data/concurrent.csv',
-  changelog: 'data/changelog.csv',
-  staff_events: 'data/staff_events.csv'
+  changelog: 'data/changelog.csv'
 };
 const PERIODS = [1,2,3,'break',4,5,'lunch',7,8,9,10];
 
@@ -46,7 +45,7 @@ function todayIsoLocal(){
   return d.toISOString().slice(0,10);
 }
 function computeCutoffDate(data){
-  const rows=[...(data.sessions||[]), ...(data.cover||[]), ...(data.leadership||[]), ...(data.concurrent||[]), ...(data.staff_events||[])];
+  const rows=[...(data.sessions||[]), ...(data.cover||[]), ...(data.leadership||[]), ...(data.concurrent||[])];
   const dates=unique(rows.map(r=>r.date_iso)).sort();
   const today=todayIsoLocal();
   return dates.find(d=>d>=today) || dates[dates.length-1] || today;
@@ -102,7 +101,7 @@ function renderSummary(data){
   const sessions=data.sessions;
   const latest=[...sessions].sort((a,b)=>(b.date_iso||'').localeCompare(a.date_iso||'') || Number(b.end_period||0)-Number(a.end_period||0))[0];
   const triples=sessions.filter(s=>/triple|P\d+\s*[–-]\s*P\d+/i.test(s.opportunity_type+' '+s.window) && Number(s.end_period)-Number(s.start_period)>=2).length;
-  const teachers=unique([...sessions.map(s=>s.start_leader), ...(data.staff_events||[]).map(e=>e.staff), ...data.cover.flatMap(c=>splitPeople(c.normal_teacher+';'+c.cover_destination)), ...data.leadership.map(l=>l.leader)]);
+  const teachers=unique([...sessions.map(s=>s.start_leader), ...data.cover.flatMap(c=>splitPeople(c.normal_teacher+';'+c.cover_destination)), ...data.leadership.map(l=>l.leader)]);
   const reloc=sessions.filter(s=>norm(s.relocations) && !/^none$/i.test(s.relocations)).length;
   const metrics=[
     [sessions.length,'Scheduled sessions'],
@@ -152,41 +151,29 @@ function blockHTML(s, period, kind='session'){
   if(kind==='leader') return `<span class="timeline-chip-lite ${cls}"><b>${esc(s.leader)}</b><small>${esc(s.responsibility)}</small></span>`;
   return `<span class="timeline-chip-lite ${cls}"><b>${esc(s.session_code)}</b><small>${esc(s.test)} · ${esc(s.testing_room)}</small>${cont?'<small>continuation</small>':''}</span>`;
 }
-function staffEventHTML(e){
-  const cls = e.row_class || '';
-  return `<span class="timeline-chip-lite ${esc(cls)}"><b>${esc(e.event)}</b><small>${esc(e.detail)}${e.room ? ' · '+esc(e.room) : ''}</small>${e.notes ? '<small>'+esc(e.notes)+'</small>' : ''}</span>`;
-}
-function leaderHeader(dayLeaders, p){
-  const leaders=dayLeaders.filter(l=>periodNum(l.period)===p);
-  if(!leaders.length) return '';
-  return `<span class="period-leaders">${leaders.map(l=>`${esc(l.leader)}: ${esc(l.responsibility)}`).join('<br>')}</span>`;
-}
 function renderTimeline(data){
   const sessions=[...data.sessions].sort(byDatePeriod);
-  const staffEvents=[...(data.staff_events||[])].sort(byDatePeriod);
-  const dates=unique([...sessions.map(s=>s.date_iso), ...staffEvents.map(e=>e.date_iso), ...data.leadership.map(l=>l.date_iso)]).sort();
-  const dateNames=Object.fromEntries([...sessions.map(s=>[s.date_iso,s.date]), ...staffEvents.map(e=>[e.date_iso,e.date]), ...data.leadership.map(l=>[l.date_iso,l.date])]);
-  const activeDate=VIEW_CUTOFF_DATE || dates.find(d=>d>=todayIsoLocal()) || dates[dates.length-1];
-  document.getElementById('current-day-note').textContent='Staff rows show who is actually responsible for the class/cover in each period. Session leaders are shown inside the period headings.';
+  const dates=unique(sessions.map(s=>s.date_iso)).sort();
+  const dateNames=Object.fromEntries(sessions.map(s=>[s.date_iso,s.date]));
+  const today='2026-06-12';
+  const activeDate=VIEW_CUTOFF_DATE || dates.find(d=>d>=today)||dates[dates.length-1];
+  document.getElementById('current-day-note').textContent='Past days are hidden by default. Use the Show past days button above to reveal earlier schedule days.';
   function dayCard(dateIso){
-    const dayEvents=staffEvents.filter(e=>e.date_iso===dateIso);
+    const daySessions=sessions.filter(s=>s.date_iso===dateIso);
     const dayLeaders=data.leadership.filter(l=>l.date_iso===dateIso);
-    const staff=unique(dayEvents.map(e=>e.staff)).sort();
-    const headerCells=PERIODS.map(p=>{
-      if(p==='break') return '<th class="break-head">Break</th>';
-      if(p==='lunch') return '<th class="lunch-head">P6<small>Lunch</small></th>';
-      return `<th>P${p}${leaderHeader(dayLeaders,p)}</th>`;
-    }).join('');
+    const staff=unique([...daySessions.map(s=>s.start_leader), ...dayLeaders.map(l=>l.leader)]).sort();
     const rows=staff.map(name=>{
       const cells=PERIODS.map(p=>{
         if(p==='break') return '<td class="break-gap"></td>';
         if(p==='lunch') return '<td class="lunch-gap"><span class="small-muted">Lunch</span></td>';
-        const html=dayEvents.filter(e=>e.staff===name && periodNum(e.period)===p).map(e=>staffEventHTML(e)).join('');
+        const sess=daySessions.filter(s=>s.start_leader===name && Number(s.start_period)<=p && Number(s.end_period)>=p);
+        const leads=dayLeaders.filter(l=>l.leader===name && periodNum(l.period)===p);
+        const html=[...sess.map(s=>blockHTML(s,p)), ...leads.map(l=>blockHTML(l,p,'leader'))].join('');
         return `<td class="staff-period-cell ${html?'staff-busy':''}">${html||''}</td>`;
       }).join('');
       return `<tr class="staff-row"><th class="staff-row-name">${esc(name)}</th>${cells}</tr>`;
     }).join('');
-    return `<div class="day-timeline-card ${dateIso===activeDate?'timeline-day-current':''}"><h3>${esc(dateNames[dateIso]||dateIso)} <span class="timeline-day-toggle">${dateIso===activeDate?'Today':'Hide'}</span></h3><table class="staff-row-table day-timeline-table"><thead><tr><th class="staff-head">Staff</th>${headerCells}</tr></thead><tbody>${rows||'<tr><td colspan="12" class="empty-state">No staff rows for this date</td></tr>'}</tbody></table></div>`;
+    return `<div class="day-timeline-card ${dateIso===activeDate?'timeline-day-current':''}"><h3>${esc(dateNames[dateIso]||dateIso)} <span class="timeline-day-toggle">${dateIso===activeDate?'Today':'Hide'}</span></h3><table class="staff-row-table day-timeline-table"><thead><tr><th class="staff-head">Staff</th><th>P1</th><th>P2</th><th>P3</th><th class="break-head">Break</th><th>P4</th><th>P5</th><th class="lunch-head">P6<small>Lunch</small></th><th>P7</th><th>P8</th><th>P9</th><th>P10</th></tr></thead><tbody>${rows||'<tr><td colspan="12" class="empty-state">No rows</td></tr>'}</tbody></table></div>`;
   }
   const currentFuture=dates.filter(d=>d>=activeDate).map(dayCard).join('');
   const past=dates.filter(d=>d<activeDate).map(dayCard).join('');
@@ -208,25 +195,21 @@ function renderClassViews(data){
   document.getElementById('exportClassBtn').onclick=()=>printElement(document.querySelector(`.class-view[data-class="${CSS.escape(sel.value)}"]`), `${sel.value} PT class view`);
 }
 function renderTeacherViews(data){
-  const staffEvents=[...(data.staff_events||[])];
-  const people=unique([...staffEvents.map(e=>e.staff), ...data.leadership.flatMap(l=>splitPeople(l.leader))]).sort();
+  const people=unique([...data.sessions.map(s=>s.start_leader), ...data.leadership.map(l=>l.leader), ...data.cover.flatMap(c=>splitPeople(c.normal_teacher+';'+c.cover_destination))]).sort();
   const sel=document.getElementById('teacherSelect'); sel.innerHTML=people.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
   const wrap=document.getElementById('teacherViews');
   wrap.innerHTML=people.map(p=>{
-    const dates=unique([
-      ...staffEvents.filter(e=>e.staff===p).map(e=>e.date_iso),
-      ...data.leadership.filter(l=>splitPeople(l.leader).includes(p) || String(l.leader||'').includes(p)).map(l=>l.date_iso)
-    ]).sort();
     const cards=[];
+    const dates=unique([...data.sessions.filter(s=>s.start_leader===p).map(s=>s.date_iso), ...data.leadership.filter(l=>l.leader===p).map(l=>l.date_iso), ...data.cover.filter(c=>(c.normal_teacher+' '+c.cover_destination).includes(p)).map(c=>c.date_iso)]).sort();
     for(const d of dates){
-      const label=(staffEvents.find(e=>e.date_iso===d)||data.leadership.find(l=>l.date_iso===d)||data.sessions.find(s=>s.date_iso===d)||{}).date || d;
+      const label=(data.sessions.find(s=>s.date_iso===d)||data.cover.find(c=>c.date_iso===d)||data.leadership.find(l=>l.date_iso===d)||{}).date || d;
       const rows=[];
-      staffEvents.filter(e=>e.date_iso===d && e.staff===p).sort(byDatePeriod).forEach(e=>rows.push({p:periodNum(e.period), html:`<tr class="${rowClass(e)}"><td>${esc(e.period)}</td><td>${esc(e.event)}</td><td>${esc(e.detail)}</td><td>${esc(e.room)}</td><td>${esc(e.notes)}</td></tr>`}));
-      data.leadership.filter(l=>l.date_iso===d && (splitPeople(l.leader).includes(p) || String(l.leader||'').includes(p))).sort(byDatePeriod).forEach(l=>rows.push({p:periodNum(l.period), html:`<tr class="leader-row ${rowClass(l)}"><td>${esc(l.period)}</td><td>Session leader / mobile</td><td>${esc(l.responsibility)}</td><td></td><td>Mobile load: ${esc(l.mobile_load)}. Leadership is shown in the period heading, not as class supervision.</td></tr>`}));
-      rows.sort((a,b)=>a.p-b.p);
-      cards.push(`<div class="teacher-day-card ${d < VIEW_CUTOFF_DATE ? 'past-card' : ''}"><h4>${esc(label)}</h4><div class="tablewrap"><table><thead><tr><th>Period</th><th>Event</th><th>Detail</th><th>Room / destination</th><th>Notes</th></tr></thead><tbody>${rows.map(r=>r.html).join('')}</tbody></table></div></div>`);
+      data.sessions.filter(s=>s.date_iso===d && s.start_leader===p).sort(byDatePeriod).forEach(s=>rows.push(`<tr class="testevent ${rowClass(s)}"><td>${esc(s.window)}</td><td>${esc(s.session_code)}</td><td>${esc(s.test)}</td><td>${esc(s.testing_room)}</td><td>${esc(s.normal_lessons_used)}</td></tr>`));
+      data.leadership.filter(l=>l.date_iso===d && l.leader===p).sort(byDatePeriod).forEach(l=>rows.push(`<tr><td>${esc(l.period)}</td><td>Leadership</td><td>${esc(l.responsibility)}</td><td></td><td>Load: ${esc(l.mobile_load)}</td></tr>`));
+      data.cover.filter(c=>c.date_iso===d && (c.normal_teacher+' '+c.cover_destination).includes(p)).sort(byDatePeriod).forEach(c=>rows.push(`<tr class="relocateevent ${rowClass(c)}"><td>${esc(c.period)}</td><td>${esc(c.type)}</td><td>${esc(c.trigger_session)}</td><td>${esc(c.cover_destination)}</td><td>${esc(c.instruction)}</td></tr>`));
+      cards.push(`<div class="teacher-day-card ${d < VIEW_CUTOFF_DATE ? 'past-card' : ''}"><h4>${esc(label)}</h4><div class="tablewrap"><table><thead><tr><th>Period</th><th>Event</th><th>Detail</th><th>Room / destination</th><th>Notes</th></tr></thead><tbody>${rows.join('')}</tbody></table></div></div>`);
     }
-    return `<div class="teacher-view" data-teacher="${esc(p)}"><h3>${esc(p)}</h3><p class="teacher-summary">Staff rows are generated from <code>staff_events.csv</code>. Session leadership is shown separately and does not imply classroom supervision.</p><div class="teacher-day-timeline-list">${cards.join('')||'<div class="empty-state">No records</div>'}</div></div>`;
+    return `<div class="teacher-view" data-teacher="${esc(p)}"><h3>${esc(p)}</h3><p class="teacher-summary">Generated from sessions, leadership and cover data.</p><div class="teacher-day-timeline-list">${cards.join('')||'<div class="empty-state">No records</div>'}</div></div>`;
   }).join('');
   function show(){document.querySelectorAll('.teacher-view').forEach(v=>v.classList.toggle('active', v.dataset.teacher===sel.value));}
   sel.onchange=show; show();
@@ -285,10 +268,10 @@ function initTabs(){
 }
 async function init(){
   try{
-    const [meta,sessions,cover,leadership,adjustments,concurrent,changelog,staff_events] = await Promise.all([loadJSON(DATA_PATHS.meta), loadCSV(DATA_PATHS.sessions), loadCSV(DATA_PATHS.cover), loadCSV(DATA_PATHS.leadership), loadCSV(DATA_PATHS.adjustments), loadCSV(DATA_PATHS.concurrent), loadOptionalCSV(DATA_PATHS.changelog), loadOptionalCSV(DATA_PATHS.staff_events)]);
+    const [meta,sessions,cover,leadership,adjustments,concurrent,changelog] = await Promise.all([loadJSON(DATA_PATHS.meta), loadCSV(DATA_PATHS.sessions), loadCSV(DATA_PATHS.cover), loadCSV(DATA_PATHS.leadership), loadCSV(DATA_PATHS.adjustments), loadCSV(DATA_PATHS.concurrent), loadOptionalCSV(DATA_PATHS.changelog)]);
     document.getElementById('page-title').textContent=meta.title || 'MYP PT Schedule V2';
     document.getElementById('page-subtitle').textContent=meta.subtitle || 'Data-driven schedule viewer';
-    const data={sessions,cover,leadership,adjustments,concurrent,changelog,staff_events};
+    const data={sessions,cover,leadership,adjustments,concurrent,changelog};
     initPastVisibility(data);
     renderSummary(data); renderTimeline(data); renderFullSchedule(sessions); renderCover(cover); renderLeadership(leadership); renderAdjustments(adjustments); renderConcurrent(concurrent); renderClassViews(data); renderTeacherViews(data); renderChecks(data); renderChangeLog(changelog); initTabs();
     document.getElementById('load-status').textContent=`Loaded ${sessions.length} sessions`;

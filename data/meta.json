@@ -1,6 +1,6 @@
 {
   "title": "MYP PT Schedule V2",
-  "subtitle": "Updated MYP PT Schedule V2: Thu 11 correction applied — 6E does not test on Thu 11; 7C goes directly to F2-07 with Natalie; 6E cover with Liam P4 only. 8A PTMBOTH Mon 22 update applied. PTE triple update applied. Shadow Day/G8 event update applied. Saeed Tue P8 / Sarum Wed cover update applied.",
+  "subtitle": "Data-driven MYP PT Schedule V2 with changelog and staff-by-period accountability fixes.",
   "source_file": "Thursday_11th_cover_update.html",
   "generated_from": "Thursday_11th_cover_update.html",
   "data_files": [
@@ -21,5 +21,6 @@
   },
   "latest_version": "v2026-06-12.1",
   "published_date": "2026-06-12",
-  "changelog_file": "changelog.csv"
+  "changelog_file": "changelog.csv",
+  "version": "v2026-06-12.2"
 }

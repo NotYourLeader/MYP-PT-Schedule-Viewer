@@ -5,7 +5,8 @@ const DATA_PATHS = {
   leadership: 'data/leadership.csv',
   adjustments: 'data/adjustments.csv',
   concurrent: 'data/concurrent.csv',
-  changelog: 'data/changelog.csv'
+  changelog: 'data/changelog.csv',
+  staff_events: 'data/staff_events.csv'
 };
 const PERIODS = [1,2,3,'break',4,5,'lunch',7,8,9,10];
 
@@ -45,7 +46,7 @@ function todayIsoLocal(){
   return d.toISOString().slice(0,10);
 }
 function computeCutoffDate(data){
-  const rows=[...(data.sessions||[]), ...(data.cover||[]), ...(data.leadership||[]), ...(data.concurrent||[])];
+  const rows=[...(data.sessions||[]), ...(data.cover||[]), ...(data.leadership||[]), ...(data.concurrent||[]), ...(data.staff_events||[])];
   const dates=unique(rows.map(r=>r.date_iso)).sort();
   const today=todayIsoLocal();
   return dates.find(d=>d>=today) || dates[dates.length-1] || today;
@@ -101,7 +102,7 @@ function renderSummary(data){
   const sessions=data.sessions;
   const latest=[...sessions].sort((a,b)=>(b.date_iso||'').localeCompare(a.date_iso||'') || Number(b.end_period||0)-Number(a.end_period||0))[0];
   const triples=sessions.filter(s=>/triple|P\d+\s*[–-]\s*P\d+/i.test(s.opportunity_type+' '+s.window) && Number(s.end_period)-Number(s.start_period)>=2).length;
-  const teachers=unique([...sessions.map(s=>s.start_leader), ...data.cover.flatMap(c=>splitPeople(c.normal_teacher+';'+c.cover_destination)), ...data.leadership.map(l=>l.leader)]);
+  const teachers=unique([...sessions.map(s=>s.start_leader), ...(data.staff_events||[]).map(e=>e.staff), ...data.cover.flatMap(c=>splitPeople(c.normal_teacher+';'+c.cover_destination)), ...data.leadership.map(l=>l.leader)]);
   const reloc=sessions.filter(s=>norm(s.relocations) && !/^none$/i.test(s.relocations)).length;
   const metrics=[
     [sessions.length,'Scheduled sessions'],
@@ -151,24 +152,35 @@ function blockHTML(s, period, kind='session'){
   if(kind==='leader') return `<span class="timeline-chip-lite ${cls}"><b>${esc(s.leader)}</b><small>${esc(s.responsibility)}</small></span>`;
   return `<span class="timeline-chip-lite ${cls}"><b>${esc(s.session_code)}</b><small>${esc(s.test)} · ${esc(s.testing_room)}</small>${cont?'<small>continuation</small>':''}</span>`;
 }
+function staffEventHTML(e){
+  const cls = e.row_class || '';
+  return `<span class="timeline-chip-lite ${esc(cls)}"><b>${esc(e.event)}</b><small>${esc(e.detail)}${e.room ? ' · '+esc(e.room) : ''}</small>${e.notes ? '<small>'+esc(e.notes)+'</small>' : ''}</span>`;
+}
 function renderTimeline(data){
   const sessions=[...data.sessions].sort(byDatePeriod);
-  const dates=unique(sessions.map(s=>s.date_iso)).sort();
-  const dateNames=Object.fromEntries(sessions.map(s=>[s.date_iso,s.date]));
+  const dates=unique([...sessions.map(s=>s.date_iso), ...(data.staff_events||[]).map(e=>e.date_iso)]).sort();
+  const dateNames=Object.fromEntries([...sessions.map(s=>[s.date_iso,s.date]), ...(data.staff_events||[]).map(e=>[e.date_iso,e.date])]);
   const today='2026-06-12';
   const activeDate=VIEW_CUTOFF_DATE || dates.find(d=>d>=today)||dates[dates.length-1];
   document.getElementById('current-day-note').textContent='Past days are hidden by default. Use the Show past days button above to reveal earlier schedule days.';
   function dayCard(dateIso){
+    const dayEvents=(data.staff_events||[]).filter(e=>e.date_iso===dateIso);
     const daySessions=sessions.filter(s=>s.date_iso===dateIso);
     const dayLeaders=data.leadership.filter(l=>l.date_iso===dateIso);
-    const staff=unique([...daySessions.map(s=>s.start_leader), ...dayLeaders.map(l=>l.leader)]).sort();
+    const useEvents=dayEvents.length>0;
+    const staff=useEvents ? unique(dayEvents.map(e=>e.staff)).sort() : unique([...daySessions.map(s=>s.start_leader), ...dayLeaders.map(l=>l.leader)]).sort();
     const rows=staff.map(name=>{
       const cells=PERIODS.map(p=>{
         if(p==='break') return '<td class="break-gap"></td>';
         if(p==='lunch') return '<td class="lunch-gap"><span class="small-muted">Lunch</span></td>';
-        const sess=daySessions.filter(s=>s.start_leader===name && Number(s.start_period)<=p && Number(s.end_period)>=p);
-        const leads=dayLeaders.filter(l=>l.leader===name && periodNum(l.period)===p);
-        const html=[...sess.map(s=>blockHTML(s,p)), ...leads.map(l=>blockHTML(l,p,'leader'))].join('');
+        let html='';
+        if(useEvents){
+          html=dayEvents.filter(e=>e.staff===name && periodNum(e.period)===p).map(e=>staffEventHTML(e)).join('');
+        } else {
+          const sess=daySessions.filter(s=>s.start_leader===name && Number(s.start_period)<=p && Number(s.end_period)>=p);
+          const leads=dayLeaders.filter(l=>l.leader===name && periodNum(l.period)===p);
+          html=[...sess.map(s=>blockHTML(s,p)), ...leads.map(l=>blockHTML(l,p,'leader'))].join('');
+        }
         return `<td class="staff-period-cell ${html?'staff-busy':''}">${html||''}</td>`;
       }).join('');
       return `<tr class="staff-row"><th class="staff-row-name">${esc(name)}</th>${cells}</tr>`;
@@ -195,21 +207,31 @@ function renderClassViews(data){
   document.getElementById('exportClassBtn').onclick=()=>printElement(document.querySelector(`.class-view[data-class="${CSS.escape(sel.value)}"]`), `${sel.value} PT class view`);
 }
 function renderTeacherViews(data){
-  const people=unique([...data.sessions.map(s=>s.start_leader), ...data.leadership.map(l=>l.leader), ...data.cover.flatMap(c=>splitPeople(c.normal_teacher+';'+c.cover_destination))]).sort();
+  const useEvents=(data.staff_events||[]).length>0;
+  const people=useEvents ? unique(data.staff_events.map(e=>e.staff)).sort() : unique([...data.sessions.map(s=>s.start_leader), ...data.leadership.map(l=>l.leader), ...data.cover.flatMap(c=>splitPeople(c.normal_teacher+';'+c.cover_destination))]).sort();
   const sel=document.getElementById('teacherSelect'); sel.innerHTML=people.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
   const wrap=document.getElementById('teacherViews');
   wrap.innerHTML=people.map(p=>{
     const cards=[];
-    const dates=unique([...data.sessions.filter(s=>s.start_leader===p).map(s=>s.date_iso), ...data.leadership.filter(l=>l.leader===p).map(l=>l.date_iso), ...data.cover.filter(c=>(c.normal_teacher+' '+c.cover_destination).includes(p)).map(c=>c.date_iso)]).sort();
+    let dates=[];
+    if(useEvents){
+      dates=unique(data.staff_events.filter(e=>e.staff===p).map(e=>e.date_iso)).sort();
+    } else {
+      dates=unique([...data.sessions.filter(s=>s.start_leader===p).map(s=>s.date_iso), ...data.leadership.filter(l=>l.leader===p).map(l=>l.date_iso), ...data.cover.filter(c=>(c.normal_teacher+' '+c.cover_destination).includes(p)).map(c=>c.date_iso)]).sort();
+    }
     for(const d of dates){
-      const label=(data.sessions.find(s=>s.date_iso===d)||data.cover.find(c=>c.date_iso===d)||data.leadership.find(l=>l.date_iso===d)||{}).date || d;
+      const label=(data.staff_events||[]).find(e=>e.date_iso===d)?.date || (data.sessions.find(s=>s.date_iso===d)||data.cover.find(c=>c.date_iso===d)||data.leadership.find(l=>l.date_iso===d)||{}).date || d;
       const rows=[];
-      data.sessions.filter(s=>s.date_iso===d && s.start_leader===p).sort(byDatePeriod).forEach(s=>rows.push(`<tr class="testevent ${rowClass(s)}"><td>${esc(s.window)}</td><td>${esc(s.session_code)}</td><td>${esc(s.test)}</td><td>${esc(s.testing_room)}</td><td>${esc(s.normal_lessons_used)}</td></tr>`));
-      data.leadership.filter(l=>l.date_iso===d && l.leader===p).sort(byDatePeriod).forEach(l=>rows.push(`<tr><td>${esc(l.period)}</td><td>Leadership</td><td>${esc(l.responsibility)}</td><td></td><td>Load: ${esc(l.mobile_load)}</td></tr>`));
-      data.cover.filter(c=>c.date_iso===d && (c.normal_teacher+' '+c.cover_destination).includes(p)).sort(byDatePeriod).forEach(c=>rows.push(`<tr class="relocateevent ${rowClass(c)}"><td>${esc(c.period)}</td><td>${esc(c.type)}</td><td>${esc(c.trigger_session)}</td><td>${esc(c.cover_destination)}</td><td>${esc(c.instruction)}</td></tr>`));
+      if(useEvents){
+        data.staff_events.filter(e=>e.date_iso===d && e.staff===p).sort(byDatePeriod).forEach(e=>rows.push(`<tr class="${rowClass(e)}"><td>${esc(e.period)}</td><td>${esc(e.event)}</td><td>${esc(e.detail)}</td><td>${esc(e.room)}</td><td>${esc(e.notes)}</td></tr>`));
+      } else {
+        data.sessions.filter(s=>s.date_iso===d && s.start_leader===p).sort(byDatePeriod).forEach(s=>rows.push(`<tr class="testevent ${rowClass(s)}"><td>${esc(s.window)}</td><td>${esc(s.session_code)}</td><td>${esc(s.test)}</td><td>${esc(s.testing_room)}</td><td>${esc(s.normal_lessons_used)}</td></tr>`));
+        data.leadership.filter(l=>l.date_iso===d && l.leader===p).sort(byDatePeriod).forEach(l=>rows.push(`<tr><td>${esc(l.period)}</td><td>Leadership</td><td>${esc(l.responsibility)}</td><td></td><td>Load: ${esc(l.mobile_load)}</td></tr>`));
+        data.cover.filter(c=>c.date_iso===d && (c.normal_teacher+' '+c.cover_destination).includes(p)).sort(byDatePeriod).forEach(c=>rows.push(`<tr class="relocateevent ${rowClass(c)}"><td>${esc(c.period)}</td><td>${esc(c.type)}</td><td>${esc(c.trigger_session)}</td><td>${esc(c.cover_destination)}</td><td>${esc(c.instruction)}</td></tr>`));
+      }
       cards.push(`<div class="teacher-day-card ${d < VIEW_CUTOFF_DATE ? 'past-card' : ''}"><h4>${esc(label)}</h4><div class="tablewrap"><table><thead><tr><th>Period</th><th>Event</th><th>Detail</th><th>Room / destination</th><th>Notes</th></tr></thead><tbody>${rows.join('')}</tbody></table></div></div>`);
     }
-    return `<div class="teacher-view" data-teacher="${esc(p)}"><h3>${esc(p)}</h3><p class="teacher-summary">Generated from sessions, leadership and cover data.</p><div class="teacher-day-timeline-list">${cards.join('')||'<div class="empty-state">No records</div>'}</div></div>`;
+    return `<div class="teacher-view" data-teacher="${esc(p)}"><h3>${esc(p)}</h3><p class="teacher-summary">Generated from ${useEvents ? 'staff_events.csv' : 'sessions, leadership and cover data'}.</p><div class="teacher-day-timeline-list">${cards.join('')||'<div class="empty-state">No records</div>'}</div></div>`;
   }).join('');
   function show(){document.querySelectorAll('.teacher-view').forEach(v=>v.classList.toggle('active', v.dataset.teacher===sel.value));}
   sel.onchange=show; show();
@@ -256,37 +278,10 @@ function renderChangeLog(changelog){
   sortHeader(document.getElementById('changelog-table'), ['date','text','text','text','text','text','text']);
 }
 function initTabs(){
-  const defaultTab = 'Timeline';
-
-  const panels = [...document.querySelectorAll('main > section.panel')];
-  panels.forEach(p => p.classList.add('tab-panel'));
-
-  const tabs = unique(panels.map(p => p.dataset.tab));
-  const initialTab = tabs.includes(defaultTab) ? defaultTab : tabs[0];
-
-  const nav = document.createElement('div');
-  nav.id = 'tab-nav';
-
-  tabs.forEach(t => {
-    const btn = document.createElement('button');
-    btn.className = 'tab-btn' + (t === initialTab ? ' active' : '');
-    btn.textContent = t;
-
-    btn.onclick = () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      panels.forEach(p => p.classList.toggle('active', p.dataset.tab === t));
-      window.scrollTo(0, 0);
-    };
-
-    nav.appendChild(btn);
-  });
-
-  document.querySelector('header').insertAdjacentElement('afterend', nav);
-
-  panels.forEach(p => {
-    p.classList.toggle('active', p.dataset.tab === initialTab);
-  });
+  const panels=[...document.querySelectorAll('main > section.panel')]; panels.forEach(p=>p.classList.add('tab-panel')); const tabs=unique(panels.map(p=>p.dataset.tab));
+  const nav=document.createElement('div'); nav.id='tab-nav';
+  tabs.forEach((t,i)=>{const btn=document.createElement('button');btn.className='tab-btn'+(i===0?' active':'');btn.textContent=t;btn.onclick=()=>{document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');panels.forEach(p=>p.classList.toggle('active',p.dataset.tab===t));window.scrollTo(0,0);};nav.appendChild(btn);});
+  document.querySelector('header').insertAdjacentElement('afterend', nav); panels.forEach((p,i)=>p.classList.toggle('active',p.dataset.tab===tabs[0]));
 }
 async function init(){
   try{

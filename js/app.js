@@ -475,7 +475,7 @@ function renderTimeline() {
     </colgroup>`;
 
     const thead = `<thead><tr>
-      <th class="staff-head">Staff / Session</th>
+      <th class="staff-head">Staff</th>
       ${['P1','P2','P3'].map(p => {
         const leaders = getLeaders(dateIso, p);
         return `<th><b>${p}</b>${leaders.length ? `<span class="period-leaders">${esc(leaders.map(l=>l.leader).join(', '))}</span>` : ''}</th>`;
@@ -492,32 +492,104 @@ function renderTimeline() {
       }).join('')}
     </tr></thead>`;
 
-    // Build session rows (one row per session for compact view)
-    const sessionRows = activeSessions.map(s => {
-      const sp = pNum(s.start_period), ep = pNum(s.end_period);
-      const cls = sessionClass(s);
-      const rowCls = s.status === 'rescheduled' ? 'rescheduled-pt' : '';
+    // ── Determine the room teacher for a session ──
+    function getRoomTeacher(s) {
+      // 1. Supervisor field (primary room person)
+      if (s.supervisor) {
+        const first = s.supervisor.split(/[→,]/)[0].trim();
+        return normalizeName(first) || s.supervisor.trim();
+      }
+      // 2. Extract "with [Name]" from normal_lessons_used
+      const wm = (s.normal_lessons_used || '').match(/with\s+([A-Z][a-zé]+(?:\s+(?:Oliver-Caldwell|[A-Z][a-zé]+(?:\s+[A-Z]\.?\s*[A-Z][a-zé]+)?))?)/);
+      if (wm) return wm[1].trim();
+      // 3. Fall back to start_leader (normalized, first name only)
+      if (s.start_leader) {
+        const first = s.start_leader.split(/[→,/]/)[0].trim();
+        return normalizeName(first) || s.start_leader.trim();
+      }
+      return 'Unassigned';
+    }
+
+    // ── Group active sessions by room teacher ──
+    const staffMap = {};  // teacherName → [{session, sp, ep, cls}]
+    activeSessions.forEach(s => {
+      const teacher = getRoomTeacher(s);
+      if (!staffMap[teacher]) staffMap[teacher] = [];
+      staffMap[teacher].push(s);
+    });
+
+    // ── Add "Cover needed" rows from leadership on this day ──
+    const dayLeadership = leadership.filter(l => l.date_iso === dateIso && l.status !== 'cancelled');
+    dayLeadership.forEach(l => {
+      const name = normalizeName(l.leader);
+      if (name === 'Cover needed' || l.mobile_load === 'RED') {
+        if (!staffMap['⚠ Cover needed']) staffMap['⚠ Cover needed'] = [];
+        // Create a synthetic session-like object for the cover gap
+        staffMap['⚠ Cover needed'].push({
+          session_code: l.responsibility,
+          class: '',
+          grade: '',
+          test: '',
+          window: l.period,
+          start_period: l.period,
+          end_period: l.period,
+          testing_room: '',
+          notes: l.notes || '',
+          status: 'red',
+          _isCoverGap: true
+        });
+      }
+    });
+
+    // ── Sort staff: "Cover needed" last, then alphabetical ──
+    const staffNames = Object.keys(staffMap).sort((a, b) => {
+      if (a.startsWith('⚠')) return 1;
+      if (b.startsWith('⚠')) return -1;
+      return a.localeCompare(b);
+    });
+
+    // ── Build one row per staff member ──
+    const sessionRows = staffNames.map(teacher => {
+      const teacherSessions = staffMap[teacher];
+      const isCoverRow = teacher.startsWith('⚠');
+      const rowCls = isCoverRow ? 'red-risk' : '';
 
       const cells = ['P1','P2','P3','P4','P5','P7','P8','P9','P10'].map(p => {
         const pp = pNum(p);
-        const inRange = pp >= sp && pp <= ep;
-        const isStart = pp === sp;
-        if (!inRange) return `<td class="staff-period-cell"></td>`;
-        return `<td class="staff-period-cell staff-busy session-span">
-          <span class="span-chip ${cls}${!isStart ? ' staff-continuation' : ''}">
+        // Find sessions active in this period for this teacher
+        const matching = teacherSessions.filter(s => {
+          const sp = pNum(s.start_period), ep = pNum(s.end_period);
+          return pp >= sp && pp <= ep;
+        });
+
+        if (!matching.length) return `<td class="staff-period-cell"></td>`;
+
+        const chips = matching.map(s => {
+          const sp = pNum(s.start_period);
+          const isStart = pp === sp;
+          const cls = s._isCoverGap ? 'other' : sessionClass(s);
+          const contCls = !isStart ? ' staff-continuation' : '';
+          return `<span class="span-chip ${cls}${contCls}">
             <span class="span-chip-top"><b>${isStart ? esc(s.session_code) : '↳ ' + esc(s.session_code)}</b><span>${esc(s.window)}</span></span>
             ${isStart ? `<small>${esc(s.testing_room)}${s.notes ? ' · ' + esc(s.notes.substring(0, 60)) : ''}</small>` : `<small>${esc(s.testing_room)}</small>`}
-          </span>
-        </td>`;
+          </span>`;
+        }).join('');
+
+        return `<td class="staff-period-cell staff-busy session-span">${chips}</td>`;
       });
 
       // Insert break and lunch cols
-      const p3Idx = 2, p5Idx = 4;
-      cells.splice(p5Idx + 1, 0, `<td class="lunch-gap"></td>`);
-      cells.splice(p3Idx + 1, 0, `<td class="break-gap"></td>`);
+      cells.splice(4 + 1, 0, `<td class="lunch-gap"></td>`);
+      cells.splice(2 + 1, 0, `<td class="break-gap"></td>`);
+
+      // Count unique sessions for this teacher
+      const uniqueSessions = [...new Set(teacherSessions.map(s => s.session_code))];
+      const subtitle = isCoverRow
+        ? ''
+        : `<small style="display:block;font-size:10px;font-weight:500;color:var(--muted)">${uniqueSessions.map(c => esc(c)).join(', ')}</small>`;
 
       return `<tr class="${rowCls}">
-        <th class="staff-row-name">${esc(s.session_code)}<small style="display:block;font-size:10px;font-weight:500;color:var(--muted)">${esc(s.class)} · G${esc(s.grade)}</small></th>
+        <th class="staff-row-name">${esc(teacher)}${subtitle}</th>
         ${cells.join('')}
       </tr>`;
     }).join('');

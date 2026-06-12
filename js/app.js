@@ -256,10 +256,37 @@ function renderChangeLog(changelog){
   sortHeader(document.getElementById('changelog-table'), ['date','text','text','text','text','text','text']);
 }
 function initTabs(){
-  const panels=[...document.querySelectorAll('main > section.panel')]; panels.forEach(p=>p.classList.add('tab-panel')); const tabs=unique(panels.map(p=>p.dataset.tab));
-  const nav=document.createElement('div'); nav.id='tab-nav';
-  tabs.forEach((t,i)=>{const btn=document.createElement('button');btn.className='tab-btn'+(i===0?' active':'');btn.textContent=t;btn.onclick=()=>{document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');panels.forEach(p=>p.classList.toggle('active',p.dataset.tab===t));window.scrollTo(0,0);};nav.appendChild(btn);});
-  document.querySelector('header').insertAdjacentElement('afterend', nav); panels.forEach((p,i)=>p.classList.toggle('active',p.dataset.tab===tabs[0]));
+  const defaultTab = 'Timeline';
+
+  const panels = [...document.querySelectorAll('main > section.panel')];
+  panels.forEach(p => p.classList.add('tab-panel'));
+
+  const tabs = unique(panels.map(p => p.dataset.tab));
+  const initialTab = tabs.includes(defaultTab) ? defaultTab : tabs[0];
+
+  const nav = document.createElement('div');
+  nav.id = 'tab-nav';
+
+  tabs.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn' + (t === initialTab ? ' active' : '');
+    btn.textContent = t;
+
+    btn.onclick = () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      panels.forEach(p => p.classList.toggle('active', p.dataset.tab === t));
+      window.scrollTo(0, 0);
+    };
+
+    nav.appendChild(btn);
+  });
+
+  document.querySelector('header').insertAdjacentElement('afterend', nav);
+
+  panels.forEach(p => {
+    p.classList.toggle('active', p.dataset.tab === initialTab);
+  });
 }
 async function init(){
   try{

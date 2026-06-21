@@ -997,10 +997,24 @@
    "code": "7D.PTEBOTH",
    "date": "Tue 23 Jun",
    "startPeriod": 1,
-   "endPeriod": 3,
+   "endPeriod": 2,
    "room": "F1-07",
    "teacher": "Sarah Taylor",
    "type": "same"
+  },
+  {
+   "code": "7D.PTEBOTH",
+   "date": "Tue 23 Jun",
+   "startPeriod": 3,
+   "endPeriod": 3,
+   "room": "F1-07",
+   "teacher": "Saeed Smith",
+   "type": "same",
+   "flag": {
+    "type": "cover",
+    "text": "P3 COVER",
+    "note": "Saeed Smith covers 7D for P3 in F1-07. 7D's normal P3 is Arabic B (mixed group with 7E/7F), so the Arabic teacher cannot release to supervise. Sarah Taylor supervises P1–P2 (her own English)."
+   }
   },
   {
    "code": "6F.PTEBOTH",
@@ -1416,6 +1430,10 @@
    {
     "period": "P10",
     "text": "Sarum Shah: 8C.PTE2"
+   },
+   {
+    "period": "P3",
+    "text": "Saeed Smith: 7D.PTEBOTH cover"
    }
   ],
   "Wed 24 Jun": [
@@ -1829,12 +1847,12 @@
    "date": "Tue 23 Jun",
    "period": "P3",
    "trigger": "7D.PTEBOTH",
-   "type": "Cover/move",
-   "affected": "7B",
-   "normalLesson": "ENGLISH",
-   "normalTeacher": "Cover needed",
+   "type": "Cover",
+   "affected": "7D",
+   "normalLesson": "ARABIC B (mixed 7D/7E/7F)",
+   "normalTeacher": "Wael Taha Elsetouhy",
    "destination": "F1-07",
-   "instruction": "7B need to be covered and moved for P3 because Sarah remains with 7D."
+   "instruction": "Saeed Smith covers 7D for P3 in F1-07. 7D normally have Arabic B at P3 in a mixed group with 7E/7F, so Wael cannot leave to supervise. Sarah Taylor stays with the test P1–P2."
   },
   {
    "rowClass": "red-risk",

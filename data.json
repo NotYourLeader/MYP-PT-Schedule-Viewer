@@ -850,7 +850,7 @@
    "startPeriod": 4,
    "endPeriod": 5,
    "room": "F1-07",
-   "teacher": "Ranjini → Sarah",
+   "teacher": "Sarah Taylor",
    "type": "same",
    "rowStaff": "Sarah Taylor"
   },
@@ -873,14 +873,18 @@
    "type": "triple"
   },
   {
-   "code": "7E.PTEBOTH",
+   "code": "7E supervision",
    "date": "Thu 18 Jun",
-   "startPeriod": 3,
-   "endPeriod": 3,
-   "room": "F1-07",
-   "teacher": "Ranjini → Sarah",
-   "type": "same",
-   "rowStaff": "Ranjini Krishnan"
+   "startPeriod": 7,
+   "endPeriod": 7,
+   "room": "F1-10",
+   "teacher": "Saeed Smith",
+   "type": "crosscore",
+   "flag": {
+    "type": "cover",
+    "text": "SUPERVISION",
+    "note": "Saeed Smith supervises 7E at P7 in F1-10."
+   }
   },
   {
    "code": "8B.PTE2",
@@ -923,10 +927,29 @@
    "code": "8F.PTE2",
    "date": "Mon 22 Jun",
    "startPeriod": 5,
-   "endPeriod": 7,
-   "room": "C2-12",
+   "endPeriod": 5,
+   "room": "F1-03",
    "teacher": "Luke Clarke",
-   "type": "other"
+   "type": "same",
+   "flag": {
+    "type": "cover",
+    "text": "P5 START",
+    "note": "8F.PTE2 starts P5 with Luke Clarke (English) in F1-03 — 8F's normal English room. Continues after lunch at P7 with Anna Shishikura in the same room."
+   }
+  },
+  {
+   "code": "8F.PTE2",
+   "date": "Mon 22 Jun",
+   "startPeriod": 7,
+   "endPeriod": 7,
+   "room": "F1-03",
+   "teacher": "Anna Shishikura",
+   "type": "same",
+   "flag": {
+    "type": "cover",
+    "text": "P7",
+    "note": "Anna Shishikura continues 8F.PTE2 at P7 in F1-03 (her own CONNECTED period with 8F). Same room as P5; class does not move."
+   }
   },
   {
    "code": "8E.PTE2",
@@ -941,37 +964,23 @@
    "code": "8A.PTMBOTH MOVED",
    "date": "Mon 22 Jun",
    "startPeriod": 8,
-   "endPeriod": 10,
+   "endPeriod": 9,
    "room": "F2-06",
    "teacher": "Mohammed Gias M. Gias",
    "type": "same"
   },
   {
-   "code": "6D.PTE2",
+   "code": "8A.PTMBOTH MOVED",
    "date": "Mon 22 Jun",
-   "startPeriod": 4,
-   "endPeriod": 4,
-   "room": "F1-08",
-   "teacher": "Cherisse Corbie",
+   "startPeriod": 10,
+   "endPeriod": 10,
+   "room": "F2-06",
+   "teacher": "Shubhrum Pun",
    "type": "same",
    "flag": {
     "type": "cover",
-    "text": "P4 START",
-    "note": "6D start PTE Part 2 with Cherisse Corbie in F1-08 at P4 (her own English lesson). Sunandhini Subramanian supervises P5 in the same room."
-   }
-  },
-  {
-   "code": "6D.PTE2",
-   "date": "Mon 22 Jun",
-   "startPeriod": 5,
-   "endPeriod": 5,
-   "room": "F1-08",
-   "teacher": "Sunandhini  Subramanian",
-   "type": "same",
-   "flag": {
-    "type": "cover",
-    "text": "P5",
-    "note": "Sunandhini Subramanian supervises 6D for P5 in F1-08 (her own Maths period with 6D). Class stays in the same room throughout; no move."
+    "text": "P10 COVER",
+    "note": "Shubhrum Pun (8A's usual teacher) supervises 8A for P10 in F2-06 — the test stays in the maths room throughout, no mid-test move. Oliver Pennington keeps 8B for their blocked Design & Innovation lesson."
    }
   },
   {
@@ -1055,15 +1064,6 @@
    "rowStaff": "Liam Melville"
   },
   {
-   "code": "8E.PTE1 MOVED",
-   "date": "Thu 25 Jun",
-   "startPeriod": 2,
-   "endPeriod": 3,
-   "room": "F1-06",
-   "teacher": "Sarum Shah",
-   "type": "same"
-  },
-  {
    "code": "8D.PTM2 MOVED",
    "date": "Thu 25 Jun",
    "startPeriod": 8,
@@ -1084,24 +1084,6 @@
    "rowStaff": "Zoe Denton"
   },
   {
-   "code": "9B.PTEBOTH MOVED",
-   "date": "Thu 25 Jun",
-   "startPeriod": 8,
-   "endPeriod": 10,
-   "room": "G2-01",
-   "teacher": "Vanessa Pinto",
-   "type": "same"
-  },
-  {
-   "code": "9A.PTEBOTH MOVED",
-   "date": "Thu 25 Jun",
-   "startPeriod": 8,
-   "endPeriod": 10,
-   "room": "F1-04",
-   "teacher": "Melanie Reeve",
-   "type": "same"
-  },
-  {
    "code": "8D.PTM2 MOVED",
    "date": "Thu 25 Jun",
    "startPeriod": 8,
@@ -1110,15 +1092,6 @@
    "teacher": "Fiona/Zoe/Michelle affected",
    "type": "same",
    "rowStaff": "Fiona Williams"
-  },
-  {
-   "code": "8F.PTE1 MOVED",
-   "date": "Thu 25 Jun",
-   "startPeriod": 9,
-   "endPeriod": 10,
-   "room": "C2-12",
-   "teacher": "Luke Clarke",
-   "type": "same"
   },
   {
    "code": "7D.PTS",
@@ -1138,6 +1111,52 @@
    "teacher": "Uchena/Quratul cover",
    "type": "same",
    "rowStaff": "Quratul Ain"
+  },
+  {
+   "code": "9A.PTEBOTH",
+   "date": "Mon 22 Jun",
+   "startPeriod": 5,
+   "endPeriod": 5,
+   "room": "F1-04",
+   "teacher": "Melanie Reeve",
+   "type": "same",
+   "flag": {
+    "type": "cover",
+    "text": "START",
+    "note": "9A.PTEBOTH make-up moved to Mon 22 P5–P7 — Melanie Reeve's own 9-English periods in F1-04. Continues after lunch at P7; no displacement."
+   }
+  },
+  {
+   "code": "9A.PTEBOTH",
+   "date": "Mon 22 Jun",
+   "startPeriod": 7,
+   "endPeriod": 7,
+   "room": "F1-04",
+   "teacher": "Melanie Reeve",
+   "type": "same"
+  },
+  {
+   "code": "9B.PTEBOTH",
+   "date": "Mon 22 Jun",
+   "startPeriod": 5,
+   "endPeriod": 5,
+   "room": "G2-01",
+   "teacher": "Vanessa Pinto",
+   "type": "same",
+   "flag": {
+    "type": "cover",
+    "text": "START",
+    "note": "9B.PTEBOTH make-up moved to Mon 22 P5–P7 — Vanessa Pinto's own 9-English periods in G2-01. Continues after lunch at P7; no displacement."
+   }
+  },
+  {
+   "code": "9B.PTEBOTH",
+   "date": "Mon 22 Jun",
+   "startPeriod": 7,
+   "endPeriod": 7,
+   "room": "G2-01",
+   "teacher": "Vanessa Pinto",
+   "type": "same"
   }
  ],
  "periodLeaders": {
@@ -1323,6 +1342,10 @@
    {
     "period": "P9",
     "text": "Barry Smyth: 7C.PTE1"
+   },
+   {
+    "period": "P7",
+    "text": "Saeed Smith: 7E supervision"
    }
   ],
   "Fri 19 Jun": [
@@ -1341,24 +1364,36 @@
   ],
   "Mon 22 Jun": [
    {
-    "period": "P4",
-    "text": "Lewis Macdonald: 6D.PTE2"
-   },
-   {
-    "period": "P5",
-    "text": "Lewis Macdonald: 8E.PTE2, 8F.PTE2"
-   },
-   {
     "period": "P8",
     "text": "Hashmi Salan Shameer: 8A.PTMBOTH MOVED"
    },
    {
-    "period": "P4",
-    "text": "Cherisse Corbie: 6D.PTE2 start"
+    "period": "P5",
+    "text": "Luke Clarke: 8F.PTE2 start (F1-03)"
+   },
+   {
+    "period": "P7",
+    "text": "Anna Shishikura: 8F.PTE2 (F1-03)"
+   },
+   {
+    "period": "P10",
+    "text": "Shubhrum Pun: 8A.PTMBOTH cover (F2-06)"
    },
    {
     "period": "P5",
-    "text": "Sunandhini  Subramanian: 6D.PTE2"
+    "text": "Melanie Reeve: 9A.PTEBOTH"
+   },
+   {
+    "period": "P7",
+    "text": "Melanie Reeve: 9A.PTEBOTH"
+   },
+   {
+    "period": "P5",
+    "text": "Vanessa Pinto: 9B.PTEBOTH"
+   },
+   {
+    "period": "P7",
+    "text": "Vanessa Pinto: 9B.PTEBOTH"
    }
   ],
   "Tue 23 Jun": [
@@ -1398,14 +1433,6 @@
    }
   ],
   "Thu 25 Jun": [
-   {
-    "period": "P2",
-    "text": "Lewis Macdonald: 8E.PTE1 MOVED"
-   },
-   {
-    "period": "P8",
-    "text": "Barry Smyth: 9A.PTEBOTH MOVED"
-   },
    {
     "period": "P9",
     "text": "Monica Lopez: 7D.PTS"
@@ -1578,8 +1605,8 @@
    "affected": "7A",
    "normalLesson": "ENGLISH",
    "normalTeacher": "Cherisse Corbie",
-   "destination": "B2-07 Lab 5 - General (SCIENCE with Ryan Samuel)",
-   "instruction": "7A go to B2-07 Lab 5 - General; Ryan Samuel receives/covers them. Cherisse Corbie remains committed to 7F.PTEBOTH in F1-08."
+   "destination": "B2-07 Lab 5 (Ryan Samuel's room)",
+   "instruction": "7A go to Ryan Samuel's room (B2-07 Lab 5) at P4; Ryan Samuel receives/covers them. Cherisse Corbie remains committed to 7F.PTEBOTH in F1-08."
   },
   {
    "rowClass": "roommoveevent",
@@ -1904,18 +1931,6 @@
    "normalTeacher": "Vanessa Pinto",
    "destination": "F2-05",
    "instruction": "Vanessa Pinto supervises 9D.PTEBOTH for the full P1–P3 block, so Jairusha Jackson covers Vanessa's P3 Media Arts class (10A–10D) in F2-05. Jairusha is already in F2-05 for P1–P2."
-  },
-  {
-   "rowClass": "manualcoverevent",
-   "date": "Mon 22 Jun",
-   "period": "P5",
-   "trigger": "6D.PTE2",
-   "type": "Supervision handover",
-   "affected": "6D",
-   "normalLesson": "MATH",
-   "normalTeacher": "Sunandhini  Subramanian",
-   "destination": "F1-08",
-   "instruction": "6D.PTE2 Part 2: Cherisse Corbie starts P4 (English) in F1-08; Sunandhini Subramanian supervises P5 (her normal 6D Maths period) in the same room. No external cover; class does not move."
   }
  ],
  "leadership": {
@@ -3336,7 +3351,7 @@
      "Mon 22 Jun",
      "P5–P7<br/><small>11:00–13:00</small>",
      "PTE Part 2",
-     "<b>C2-12</b><br/><small>testing class stays here throughout</small>",
+     "<b>F1-03</b><br/><small>testing class stays here throughout</small>",
      "<span class=\"chip english\">P5 ENGLISH<br/><small>Luke Clarke</small></span><span class=\"chip other\">P7 CONNECTED<br/><small>Anna Shishikura</small></span>",
      "<span class=\"badge other\">starts with English teacher; other-subject fallback</span>",
      "<b>P5 7A</b>: MSCB with Anna Shishikura → <b>C2-11 — Anna Shishikura's room</b><br/><b>P5 7B</b>: MSCB with Anna Shishikura → <b>C2-11 — Anna Shishikura's room</b><br/><b>P5 7C</b>: MSCB with Anna Shishikura → <b>C2-11 — Anna Shishikura's room</b>"

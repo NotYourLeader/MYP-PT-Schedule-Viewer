@@ -1078,36 +1078,6 @@
    "rowStaff": "Liam Melville"
   },
   {
-   "code": "8D.PTM2 MOVED",
-   "date": "Thu 25 Jun",
-   "startPeriod": 8,
-   "endPeriod": 9,
-   "room": "B2-11",
-   "teacher": "Fiona/Zoe/Michelle affected",
-   "type": "same",
-   "rowStaff": "Yunxiu (Michelle) Cheng"
-  },
-  {
-   "code": "8D.PTM2 MOVED",
-   "date": "Thu 25 Jun",
-   "startPeriod": 8,
-   "endPeriod": 9,
-   "room": "B2-11",
-   "teacher": "Fiona/Zoe/Michelle affected",
-   "type": "same",
-   "rowStaff": "Zoe Denton"
-  },
-  {
-   "code": "8D.PTM2 MOVED",
-   "date": "Thu 25 Jun",
-   "startPeriod": 8,
-   "endPeriod": 9,
-   "room": "B2-11",
-   "teacher": "Fiona/Zoe/Michelle affected",
-   "type": "same",
-   "rowStaff": "Fiona Williams"
-  },
-  {
    "code": "7D.PTS",
    "date": "Thu 25 Jun",
    "startPeriod": 9,
@@ -1125,6 +1095,62 @@
    "teacher": "Uchena/Quratul cover",
    "type": "same",
    "rowStaff": "Quratul Ain"
+  },
+  {
+   "code": "8C cover",
+   "date": "Thu 25 Jun",
+   "startPeriod": 8,
+   "endPeriod": 8,
+   "room": "F2-10",
+   "teacher": "Zoe Denton",
+   "type": "crosscore",
+   "flag": {
+    "type": "cover",
+    "text": "COVER",
+    "note": "Zoe Denton supervises 8C at P8 in F2-10 (their normal Maths lesson) so David Barton is free to run the 8D Maths PT. Zoe normally takes 8D for Arts at this time."
+   }
+  },
+  {
+   "code": "8D.PTM2",
+   "date": "Thu 25 Jun",
+   "startPeriod": 8,
+   "endPeriod": 8,
+   "room": "B2-11",
+   "teacher": "David Barton",
+   "type": "same",
+   "flag": {
+    "type": "cover",
+    "text": "P8 START",
+    "note": "8D Maths PT (Part 2), P8–P10. David Barton starts at P8 (freed by Zoe covering his 8C class). Zoe helps at P9; David continues P10."
+   }
+  },
+  {
+   "code": "8D.PTM2",
+   "date": "Thu 25 Jun",
+   "startPeriod": 9,
+   "endPeriod": 9,
+   "room": "B2-11",
+   "teacher": "Zoe Denton",
+   "type": "same",
+   "flag": {
+    "type": "cover",
+    "text": "P9",
+    "note": "Zoe Denton helps supervise the 8D Maths PT at P9 (she normally takes 8D for Arts this period). David Barton continues at P10."
+   }
+  },
+  {
+   "code": "8D.PTM2",
+   "date": "Thu 25 Jun",
+   "startPeriod": 10,
+   "endPeriod": 10,
+   "room": "B2-11",
+   "teacher": "David Barton",
+   "type": "same",
+   "flag": {
+    "type": "cover",
+    "text": "P10",
+    "note": "David Barton continues the 8D Maths PT at P10 — his own 8D Maths lesson."
+   }
   },
   {
    "code": "9A.PTEBOTH",
@@ -1454,6 +1480,18 @@
    {
     "period": "P9",
     "text": "Monica Lopez: 7D.PTS"
+   },
+   {
+    "period": "P8",
+    "text": "Zoe Denton: 8C cover / David Barton: 8D.PTM2"
+   },
+   {
+    "period": "P9",
+    "text": "Zoe Denton: 8D.PTM2"
+   },
+   {
+    "period": "P10",
+    "text": "David Barton: 8D.PTM2"
    }
   ]
  },
@@ -1749,14 +1787,14 @@
   {
    "rowClass": "manualcoverevent",
    "date": "Thu 25 Jun",
-   "period": "P8–P9",
+   "period": "P8–P10",
    "trigger": "8D.PTM2 MOVED",
-   "type": "Affected lesson",
+   "type": "Cover/handover",
    "affected": "8D",
-   "normalLesson": "THE ARTS",
-   "normalTeacher": "Fiona Williams / Zoe Denton / Yunxiu (Michelle) Cheng",
+   "normalLesson": "THE ARTS (8D/8E/8F mixed) + 8C Maths",
+   "normalTeacher": "David Barton (8D Maths)",
    "destination": "B2-11",
-   "instruction": "8D misses The Arts to sit PTM2. No other class moved. Reprint codes."
+   "instruction": "8D Maths PT runs P8–P10. Zoe Denton covers 8C at P8 (F2-10) so David Barton is free; David runs the test at P8, Zoe helps at P9, David continues P10. Fiona Williams and Yunxiu (Michelle) Cheng keep 8E/8F for the Arts lesson."
   },
   {
    "rowClass": "manualcoverevent",
